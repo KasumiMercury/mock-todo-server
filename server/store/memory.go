@@ -31,6 +31,20 @@ func (ts *TaskMemoryStore) GetAll() []*domain.Task {
 	return tasks
 }
 
+func (ts *TaskMemoryStore) GetAllByUserID(userID int) []*domain.Task {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	tasks := make([]*domain.Task, 0)
+	for _, task := range ts.tasks {
+		if task.UserID == userID {
+			tasks = append(tasks, task)
+		}
+	}
+
+	return tasks
+}
+
 func (ts *TaskMemoryStore) GetByID(id int) (*domain.Task, bool) {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
@@ -76,5 +90,90 @@ func (ts *TaskMemoryStore) Delete(id int) bool {
 	}
 
 	delete(ts.tasks, id)
+	return true
+}
+
+type UserMemoryStore struct {
+	users  map[int]*domain.User
+	nextID int
+	mu     sync.RWMutex
+}
+
+func NewUserMemoryStore() *UserMemoryStore {
+	return &UserMemoryStore{
+		users:  make(map[int]*domain.User),
+		nextID: 1,
+	}
+}
+
+func (us *UserMemoryStore) GetByID(id int) (*domain.User, bool) {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
+
+	user, exists := us.users[id]
+	return user, exists
+}
+
+func (us *UserMemoryStore) GetByUsername(username string) (*domain.User, bool) {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
+
+	for _, user := range us.users {
+		if user.Username == username {
+			return user, true
+		}
+	}
+	return nil, false
+}
+
+func (us *UserMemoryStore) GetByEmail(email string) (*domain.User, bool) {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
+
+	for _, user := range us.users {
+		if user.Email == email {
+			return user, true
+		}
+	}
+	return nil, false
+}
+
+func (us *UserMemoryStore) Create(user *domain.User) *domain.User {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	user.ID = us.nextID
+	us.nextID++
+	user.CreatedAt = time.Now()
+	us.users[user.ID] = user
+
+	return user
+}
+
+func (us *UserMemoryStore) Update(id int, updatedUser *domain.User) (*domain.User, bool) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	existingUser, exists := us.users[id]
+	if !exists {
+		return nil, false
+	}
+
+	updatedUser.ID = id
+	updatedUser.CreatedAt = existingUser.CreatedAt
+	us.users[id] = updatedUser
+
+	return updatedUser, true
+}
+
+func (us *UserMemoryStore) Delete(id int) bool {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	if _, exists := us.users[id]; !exists {
+		return false
+	}
+
+	delete(us.users, id)
 	return true
 }

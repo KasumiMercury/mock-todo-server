@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	taskStore "github.com/KasumiMercury/mock-todo-server/server/store"
 	"log"
 	"net/http"
 	"os"
@@ -12,64 +11,137 @@ import (
 	"time"
 
 	"github.com/KasumiMercury/mock-todo-server/pid"
+	"github.com/KasumiMercury/mock-todo-server/server/auth"
+	"github.com/KasumiMercury/mock-todo-server/server/store"
 	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
-	engine  *gin.Engine
-	server  *http.Server
-	store   *taskStore.TaskStore
-	handler *TaskHandler
-	ctx     context.Context
-	cancel  context.CancelFunc
+	engine       *gin.Engine
+	server       *http.Server
+	taskStore    store.TaskStore
+	userStore    store.UserStore
+	authService  *auth.AuthService
+	taskHandler  *TaskHandler
+	authHandler  *auth.AuthHandler
+	authRequired bool
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 var serverInstance *Server
 
-func NewServer(filePath string) *Server {
+func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authRequired bool) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
-	var store taskStore.TaskStore
+	var taskStore store.TaskStore
+	var userStore store.UserStore
 
 	if filePath == "" {
-		store = taskStore.NewTaskMemoryStore()
+		taskStore = store.NewTaskMemoryStore()
+		userStore = store.NewUserMemoryStore()
 	} else {
-		store = taskStore.NewTaskFileStore(filePath)
+		taskStore = store.NewTaskFileStore(filePath)
+		userStore = store.NewUserFileStore(filePath)
 		log.Printf("Using file store at %s", filePath)
 	}
-	//memoryStore := taskStore.NewTaskMemoryStore()
-	handler := NewTaskHandler(store)
+
+	authService, err := auth.NewAuthService(userStore, keyMode, secretKey)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create auth service: %w", err)
+	}
+
+	taskHandler := NewTaskHandler(taskStore, authRequired)
+	authHandler := auth.NewAuthHandler(authService)
 
 	return &Server{
-		engine:  engine,
-		store:   &store,
-		handler: handler,
-		ctx:     ctx,
-		cancel:  cancel,
-	}
+		engine:       engine,
+		taskStore:    taskStore,
+		userStore:    userStore,
+		authService:  authService,
+		taskHandler:  taskHandler,
+		authHandler:  authHandler,
+		authRequired: authRequired,
+		ctx:          ctx,
+		cancel:       cancel,
+	}, nil
 }
 
 func (s *Server) setupRoutes() {
-	api := s.engine.Group("/")
+	// Authentication routes (no auth required)
+	authGroup := s.engine.Group("/auth")
 	{
-		api.GET("/tasks", s.handler.GetTasks)
-		api.POST("/tasks", s.handler.CreateTask)
-		api.GET("/tasks/:id", s.handler.GetTask)
-		api.PUT("/tasks/:id", s.handler.UpdateTask)
-		api.DELETE("/tasks/:id", s.handler.DeleteTask)
+		authGroup.POST("/login", s.authHandler.Login)
+		authGroup.POST("/register", s.authHandler.Register)
+		authGroup.GET("/jwks", s.authHandler.GetJWKs)
+	}
+
+	// Standard well-known endpoints (no auth required)
+	wellKnownGroup := s.engine.Group("/.well-known")
+	{
+		wellKnownGroup.GET("/jwks.json", s.authHandler.GetJWKs)
+		wellKnownGroup.GET("/openid_configuration", s.authHandler.GetOpenIDConfiguration)
+	}
+
+	if s.authRequired {
+		// Protected routes (auth required)
+		api := s.engine.Group("/")
+		api.Use(auth.AuthMiddleware(s.authService))
+		{
+			api.GET("/auth/me", s.authHandler.Me)
+			api.GET("/tasks", s.taskHandler.GetTasks)
+			api.POST("/tasks", s.taskHandler.CreateTask)
+			api.GET("/tasks/:id", s.taskHandler.GetTask)
+			api.PUT("/tasks/:id", s.taskHandler.UpdateTask)
+			api.DELETE("/tasks/:id", s.taskHandler.DeleteTask)
+		}
+	} else {
+		// Unprotected routes (no auth required)
+		api := s.engine.Group("/")
+		{
+			// Still provide /auth/me endpoint but with auth middleware
+			authRequired := api.Group("/auth")
+			authRequired.Use(auth.AuthMiddleware(s.authService))
+			{
+				authRequired.GET("/me", s.authHandler.Me)
+			}
+
+			// Task routes without auth middleware
+			api.GET("/tasks", s.taskHandler.GetTasks)
+			api.POST("/tasks", s.taskHandler.CreateTask)
+			api.GET("/tasks/:id", s.taskHandler.GetTask)
+			api.PUT("/tasks/:id", s.taskHandler.UpdateTask)
+			api.DELETE("/tasks/:id", s.taskHandler.DeleteTask)
+		}
 	}
 }
 
-func Run(port int, filePath string) error {
+func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool) error {
 	if pid.CheckRunning() {
 		return fmt.Errorf("server is already running")
 	}
 
-	serverInstance = NewServer(filePath)
+	var jwtKeyMode auth.JWTKeyMode
+	switch keyMode {
+	case "secret":
+		jwtKeyMode = auth.JWTKeyModeSecret
+	case "rsa":
+		jwtKeyMode = auth.JWTKeyModeRSA
+	default:
+		return fmt.Errorf("invalid jwt-key-mode: %s (must be 'secret' or 'rsa')", keyMode)
+	}
+
+	var err error
+	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
+
 	serverInstance.setupRoutes()
 
 	addr := fmt.Sprintf(":%d", port)
