@@ -1,11 +1,14 @@
 package pid
 
 import (
+	"fmt"
 	"github.com/adrg/xdg"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 )
 
 var PidFile string
@@ -55,11 +58,44 @@ func CreatePidFile(pid int) error {
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(string(rune(pid)))
+	_, err = file.WriteString(fmt.Sprintf("%d", pid))
 	if err != nil {
 		return err
 	}
 
 	log.Println("pid file created with PID:", pid)
+	return nil
+}
+
+func GetPid() (int, error) {
+	data, err := os.ReadFile(PidFile)
+	if err != nil {
+		return 0, err
+	}
+
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, err
+	}
+
+	return pid, nil
+}
+
+func StopByPid() error {
+	pid, err := GetPid()
+	if err != nil {
+		return fmt.Errorf("failed to read PID: %w", err)
+	}
+
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("failed to find process: %w", err)
+	}
+
+	if err := process.Signal(os.Interrupt); err != nil {
+		return fmt.Errorf("failed to send signal: %w", err)
+	}
+
+	log.Printf("sent interrupt signal to process %d", pid)
 	return nil
 }
