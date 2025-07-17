@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 type TaskFileStore struct {
@@ -15,37 +16,75 @@ type TaskFileStore struct {
 }
 
 func NewTaskFileStore(filePath string) *TaskFileStore {
-	return &TaskFileStore{
+	store := &TaskFileStore{
 		filePath: filePath,
 		nextID:   1,
 	}
+
+	// Initialize nextID based on existing tasks
+	store.initializeNextID()
+
+	return store
+}
+
+func (ts *TaskFileStore) initializeNextID() {
+	tasks := ts.loadTasksFromFile()
+	maxID := 0
+	for _, task := range tasks {
+		if task.ID > maxID {
+			maxID = task.ID
+		}
+	}
+	ts.nextID = maxID + 1
 }
 
 func (ts *TaskFileStore) GetAll() []*domain.Task {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
+	return ts.loadTasksFromFile()
+}
+
+func (ts *TaskFileStore) loadTasksFromFile() []*domain.Task {
+	// Create empty file if it doesn't exist
+	if _, err := os.Stat(ts.filePath); os.IsNotExist(err) {
+		if err := ts.createEmptyFile(); err != nil {
+			log.Println("Error creating empty tasks file:", err)
+			return []*domain.Task{}
+		}
+	}
+
 	// Read json file and unmarshal into tasks
 	file, err := os.ReadFile(ts.filePath)
 	if err != nil {
 		log.Println("Error reading tasks file:", err)
-		return nil
+		return []*domain.Task{}
+	}
+
+	// Handle empty file
+	if len(file) == 0 {
+		return []*domain.Task{}
 	}
 
 	var tasks []*domain.Task
 	if err := json.Unmarshal(file, &tasks); err != nil {
 		log.Println("Error unmarshalling tasks:", err)
-		return nil
+		return []*domain.Task{}
 	}
 
 	return tasks
+}
+
+func (ts *TaskFileStore) createEmptyFile() error {
+	emptyJSON := []byte("[]")
+	return os.WriteFile(ts.filePath, emptyJSON, 0644)
 }
 
 func (ts *TaskFileStore) GetByID(id int) (*domain.Task, bool) {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
-	tasks := ts.GetAll()
+	tasks := ts.loadTasksFromFile()
 	for _, task := range tasks {
 		if task.ID == id {
 			return task, true
@@ -60,7 +99,9 @@ func (ts *TaskFileStore) Create(task *domain.Task) *domain.Task {
 
 	task.ID = ts.nextID
 	ts.nextID++
-	tasks := ts.GetAll()
+	task.CreatedAt = time.Now().Format(time.RFC3339)
+
+	tasks := ts.loadTasksFromFile()
 	tasks = append(tasks, task)
 
 	// Marshal tasks to json and write to file
@@ -82,7 +123,7 @@ func (ts *TaskFileStore) Update(id int, updatedTask *domain.Task) (*domain.Task,
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	tasks := ts.GetAll()
+	tasks := ts.loadTasksFromFile()
 	for i, task := range tasks {
 		if task.ID == id {
 			updatedTask.ID = id
@@ -111,7 +152,7 @@ func (ts *TaskFileStore) Delete(id int) bool {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	tasks := ts.GetAll()
+	tasks := ts.loadTasksFromFile()
 	for i, task := range tasks {
 		if task.ID == id {
 			tasks = append(tasks[:i], tasks[i+1:]...) // Remove the task
