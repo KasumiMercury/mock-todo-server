@@ -25,13 +25,14 @@ type Server struct {
 	taskHandler  *TaskHandler
 	authHandler  *auth.AuthHandler
 	authRequired bool
+	authMode     auth.AuthMode
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
 
 var serverInstance *Server
 
-func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authRequired bool) (*Server, error) {
+func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authRequired bool, authMode auth.AuthMode) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	gin.SetMode(gin.ReleaseMode)
@@ -57,7 +58,7 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 	}
 
 	taskHandler := NewTaskHandler(taskStore, authRequired)
-	authHandler := auth.NewAuthHandler(authService)
+	authHandler := auth.NewAuthHandler(authService, authMode)
 
 	return &Server{
 		engine:       engine,
@@ -67,6 +68,7 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 		taskHandler:  taskHandler,
 		authHandler:  authHandler,
 		authRequired: authRequired,
+		authMode:     authMode,
 		ctx:          ctx,
 		cancel:       cancel,
 	}, nil
@@ -78,6 +80,7 @@ func (s *Server) setupRoutes() {
 	{
 		authGroup.POST("/login", s.authHandler.Login)
 		authGroup.POST("/register", s.authHandler.Register)
+		authGroup.POST("/logout", s.authHandler.Logout)
 		authGroup.GET("/jwks", s.authHandler.GetJWKs)
 	}
 
@@ -91,7 +94,7 @@ func (s *Server) setupRoutes() {
 	if s.authRequired {
 		// Protected routes (auth required)
 		api := s.engine.Group("/")
-		api.Use(auth.AuthMiddleware(s.authService))
+		api.Use(auth.AuthMiddleware(s.authService, s.authMode))
 		{
 			api.GET("/auth/me", s.authHandler.Me)
 			api.GET("/tasks", s.taskHandler.GetTasks)
@@ -106,7 +109,7 @@ func (s *Server) setupRoutes() {
 		{
 			// Still provide /auth/me endpoint but with auth middleware
 			authRequired := api.Group("/auth")
-			authRequired.Use(auth.AuthMiddleware(s.authService))
+			authRequired.Use(auth.AuthMiddleware(s.authService, s.authMode))
 			{
 				authRequired.GET("/me", s.authHandler.Me)
 			}
@@ -121,7 +124,7 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool) error {
+func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool, authModeStr string) error {
 	if pid.CheckRunning() {
 		return fmt.Errorf("server is already running")
 	}
@@ -136,8 +139,20 @@ func Run(port int, filePath string, keyMode string, secretKey string, authRequir
 		return fmt.Errorf("invalid jwt-key-mode: %s (must be 'secret' or 'rsa')", keyMode)
 	}
 
+	var authMode auth.AuthMode
+	switch authModeStr {
+	case "jwt":
+		authMode = auth.AuthModeJWT
+	case "session":
+		authMode = auth.AuthModeSession
+	case "both":
+		authMode = auth.AuthModeBoth
+	default:
+		return fmt.Errorf("invalid auth-mode: %s (must be 'jwt', 'session', or 'both')", authModeStr)
+	}
+
 	var err error
-	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired)
+	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired, authMode)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

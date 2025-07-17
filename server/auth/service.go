@@ -22,11 +22,12 @@ const (
 )
 
 type AuthService struct {
-	userStore  store.UserStore
-	keyMode    JWTKeyMode
-	secretKey  []byte
-	rsaPrivate *rsa.PrivateKey
-	rsaPublic  *rsa.PublicKey
+	userStore    store.UserStore
+	keyMode      JWTKeyMode
+	secretKey    []byte
+	rsaPrivate   *rsa.PrivateKey
+	rsaPublic    *rsa.PublicKey
+	sessionStore *SessionStore
 }
 
 type JWK struct {
@@ -43,8 +44,9 @@ type JWKSet struct {
 
 func NewAuthService(userStore store.UserStore, keyMode JWTKeyMode, secretKey string) (*AuthService, error) {
 	service := &AuthService{
-		userStore: userStore,
-		keyMode:   keyMode,
+		userStore:    userStore,
+		keyMode:      keyMode,
+		sessionStore: NewSessionStore(),
 	}
 
 	switch keyMode {
@@ -202,4 +204,34 @@ func (s *AuthService) GetJWKSet() (*JWKSet, error) {
 	}
 
 	return &JWKSet{Keys: []JWK{jwk}}, nil
+}
+
+func (s *AuthService) CreateSession(user *domain.User) (*Session, error) {
+	return s.sessionStore.CreateSession(user, 24*time.Hour)
+}
+
+func (s *AuthService) ValidateSession(sessionID string) (*Session, bool) {
+	return s.sessionStore.GetSession(sessionID)
+}
+
+func (s *AuthService) DestroySession(sessionID string) {
+	s.sessionStore.DeleteSession(sessionID)
+}
+
+func (s *AuthService) LoginWithSession(username, password string) (*domain.User, *Session, error) {
+	user, exists := s.userStore.GetByUsername(username)
+	if !exists {
+		return nil, nil, fmt.Errorf("invalid credentials")
+	}
+
+	if !s.ValidatePassword(user.HashedPassword, password) {
+		return nil, nil, fmt.Errorf("invalid credentials")
+	}
+
+	session, err := s.CreateSession(user)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
+	return user, session, nil
 }
