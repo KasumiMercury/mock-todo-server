@@ -31,7 +31,7 @@ var serveCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to run the server on")
-	serveCmd.Flags().StringVarP(&jsonFilePath, "jsonFilePath", "f", "", "File as a Data source for test")
+	serveCmd.Flags().StringVarP(&jsonFilePath, "json-file-Path", "f", "", "File as a Data source for test")
 	serveCmd.Flags().StringVar(&jwtKeyMode, "jwt-key-mode", "secret", "JWT key mode: 'secret' or 'rsa'")
 	serveCmd.Flags().StringVar(&jwtSecretKey, "jwt-secret", "test-secret-key", "JWT secret key (used when jwt-key-mode is 'secret')")
 	serveCmd.Flags().BoolVarP(&authRequired, "auth-required", "a", true, "Require authentication for task API endpoints")
