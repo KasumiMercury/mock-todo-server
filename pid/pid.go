@@ -23,7 +23,7 @@ func init() {
 				log.Fatal("failed to create pid directory:", err)
 			}
 			PidFile = pidPath
-			log.Println("creating pid file at", pidPath)
+			log.Println("pid file path:", PidFile)
 			return
 		}
 	}
@@ -39,7 +39,7 @@ func init() {
 	}
 
 	PidFile = filepath.Join(appDir, appName+".pid")
-	log.Println("creating pid file at", PidFile)
+	log.Println("pid file path:", PidFile)
 }
 
 func CheckRunning() bool {
