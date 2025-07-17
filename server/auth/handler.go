@@ -77,17 +77,6 @@ func (h *AuthHandler) GetJWKs(c *gin.Context) {
 	c.JSON(http.StatusOK, jwkSet)
 }
 
-func (h *AuthHandler) GetPublicKey(c *gin.Context) {
-	publicKey, err := h.authService.GetPublicKeyPEM()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.Header("Content-Type", "application/x-pem-file")
-	c.String(http.StatusOK, publicKey)
-}
-
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID, exists := GetUserIDFromContext(c)
 	if !exists {

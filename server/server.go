@@ -79,7 +79,6 @@ func (s *Server) setupRoutes() {
 		authGroup.POST("/login", s.authHandler.Login)
 		authGroup.POST("/register", s.authHandler.Register)
 		authGroup.GET("/jwks", s.authHandler.GetJWKs)
-		authGroup.GET("/public-key", s.authHandler.GetPublicKey)
 	}
 
 	// Standard well-known endpoints (no auth required)

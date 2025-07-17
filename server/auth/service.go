@@ -3,9 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"math/big"
 	"time"
@@ -209,22 +207,4 @@ func (s *AuthService) GetJWKSet() (*JWKSet, error) {
 	}
 
 	return &JWKSet{Keys: []JWK{jwk}}, nil
-}
-
-func (s *AuthService) GetPublicKeyPEM() (string, error) {
-	if s.keyMode != JWTKeyModeRSA {
-		return "", fmt.Errorf("public key only available in RSA mode")
-	}
-
-	publicKeyDER, err := x509.MarshalPKIXPublicKey(s.rsaPublic)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal public key: %w", err)
-	}
-
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: publicKeyDER,
-	})
-
-	return string(publicKeyPEM), nil
 }
