@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/KasumiMercury/mock-todo-server/server/domain"
 	"github.com/spf13/cobra"
@@ -87,12 +88,40 @@ func getOutputPath(args []string) string {
 }
 
 func exportTemplate(filePath string) error {
-	emptyData := FileData{
-		Tasks: []*domain.Task{},
-		Users: []*domain.User{},
+	now := time.Now()
+
+	sampleData := FileData{
+		Tasks: []*domain.Task{
+			{
+				ID:        1,
+				Title:     "Sample Task 1",
+				UserID:    1,
+				CreatedAt: now.Format(time.RFC3339),
+			},
+			{
+				ID:        2,
+				Title:     "Sample Task 2",
+				UserID:    2,
+				CreatedAt: now.Add(time.Minute).Format(time.RFC3339),
+			},
+		},
+		Users: []*domain.User{
+			{
+				ID:        1,
+				Username:  "user1",
+				Email:     "user1@example.com",
+				CreatedAt: now,
+			},
+			{
+				ID:        2,
+				Username:  "user2",
+				Email:     "user2@example.com",
+				CreatedAt: now.Add(time.Minute),
+			},
+		},
 	}
 
-	data, err := json.MarshalIndent(emptyData, "", "  ")
+	data, err := json.MarshalIndent(sampleData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal template data: %w", err)
 	}
