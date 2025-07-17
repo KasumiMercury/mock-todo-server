@@ -1,27 +1,42 @@
 package server
 
 import (
-	"github.com/KasumiMercury/mock-todo-server/server/domain"
-	taskStore "github.com/KasumiMercury/mock-todo-server/server/store"
 	"net/http"
 	"strconv"
 
+	"github.com/KasumiMercury/mock-todo-server/server/auth"
+	"github.com/KasumiMercury/mock-todo-server/server/domain"
+	"github.com/KasumiMercury/mock-todo-server/server/store"
 	"github.com/gin-gonic/gin"
 )
 
 type TaskHandler struct {
-	store taskStore.TaskStore
+	store        store.TaskStore
+	authRequired bool
 }
 
-func NewTaskHandler(store taskStore.TaskStore) *TaskHandler {
+func NewTaskHandler(store store.TaskStore, authRequired bool) *TaskHandler {
 	return &TaskHandler{
-		store: store,
+		store:        store,
+		authRequired: authRequired,
 	}
 }
 
 func (h *TaskHandler) GetTasks(c *gin.Context) {
-	tasks := h.store.GetAll()
-	c.JSON(http.StatusOK, tasks)
+	if h.authRequired {
+		userID, exists := auth.GetUserIDFromContext(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			return
+		}
+
+		tasks := h.store.GetAllByUserID(userID)
+		c.JSON(http.StatusOK, tasks)
+	} else {
+		// No authentication required, return all tasks
+		tasks := h.store.GetAll()
+		c.JSON(http.StatusOK, tasks)
+	}
 }
 
 func (h *TaskHandler) CreateTask(c *gin.Context) {
@@ -29,6 +44,19 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	if err := c.ShouldBindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
+	}
+
+	if h.authRequired {
+		userID, exists := auth.GetUserIDFromContext(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			return
+		}
+		// Set the user ID for the task
+		task.UserID = userID
+	} else {
+		// No authentication required, set UserID to 0 (anonymous)
+		task.UserID = 0
 	}
 
 	createdTask := h.store.Create(&task)
@@ -49,6 +77,19 @@ func (h *TaskHandler) GetTask(c *gin.Context) {
 		return
 	}
 
+	if h.authRequired {
+		userID, exists := auth.GetUserIDFromContext(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			return
+		}
+		// Check if the task belongs to the authenticated user
+		if task.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, task)
 }
 
@@ -60,10 +101,39 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
+	// Check if the task exists
+	existingTask, exists := h.store.GetByID(id)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	if h.authRequired {
+		userID, exists := auth.GetUserIDFromContext(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			return
+		}
+		// Check if the task belongs to the authenticated user
+		if existingTask.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+	}
+
 	var updatedTask domain.Task
 	if err := c.ShouldBindJSON(&updatedTask); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
+	}
+
+	if h.authRequired {
+		userID, _ := auth.GetUserIDFromContext(c)
+		// Ensure the task still belongs to the same user
+		updatedTask.UserID = userID
+	} else {
+		// Preserve the original UserID when auth is not required
+		updatedTask.UserID = existingTask.UserID
 	}
 
 	task, exists := h.store.Update(id, &updatedTask)
@@ -81,6 +151,26 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
 		return
+	}
+
+	if h.authRequired {
+		userID, exists := auth.GetUserIDFromContext(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			return
+		}
+
+		// Check if the task exists and belongs to the user
+		existingTask, exists := h.store.GetByID(id)
+		if !exists {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+			return
+		}
+
+		if existingTask.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	if !h.store.Delete(id) {
