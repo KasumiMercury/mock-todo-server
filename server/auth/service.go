@@ -152,14 +152,10 @@ func (s *AuthService) Login(username, password string) (*domain.User, string, er
 	return user, token, nil
 }
 
-func (s *AuthService) Register(username, email, password string) (*domain.User, string, error) {
+func (s *AuthService) Register(username, password string) (*domain.User, string, error) {
 	// Check if user already exists
 	if _, exists := s.userStore.GetByUsername(username); exists {
 		return nil, "", fmt.Errorf("username already exists")
-	}
-
-	if _, exists := s.userStore.GetByEmail(email); exists {
-		return nil, "", fmt.Errorf("email already exists")
 	}
 
 	// Hash password
@@ -171,7 +167,6 @@ func (s *AuthService) Register(username, email, password string) (*domain.User, 
 	// Create user
 	user := &domain.User{
 		Username:       username,
-		Email:          email,
 		HashedPassword: hashedPassword,
 	}
 

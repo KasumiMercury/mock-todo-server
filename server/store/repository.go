@@ -14,7 +14,6 @@ type TaskStore interface {
 type UserStore interface {
 	GetByID(id int) (*domain.User, bool)
 	GetByUsername(username string) (*domain.User, bool)
-	GetByEmail(email string) (*domain.User, bool)
 	Create(user *domain.User) *domain.User
 	Update(id int, updatedUser *domain.User) (*domain.User, bool)
 	Delete(id int) bool

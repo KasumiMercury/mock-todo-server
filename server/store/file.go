@@ -315,19 +315,6 @@ func (us *UserFileStore) GetByUsername(username string) (*domain.User, bool) {
 	return nil, false
 }
 
-func (us *UserFileStore) GetByEmail(email string) (*domain.User, bool) {
-	us.mu.RLock()
-	defer us.mu.RUnlock()
-
-	data := us.loadDataFromFile()
-	for _, user := range data.Users {
-		if user.Email == email {
-			return user, true
-		}
-	}
-	return nil, false
-}
-
 func (us *UserFileStore) Create(user *domain.User) *domain.User {
 	us.mu.Lock()
 	defer us.mu.Unlock()

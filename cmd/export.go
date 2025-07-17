@@ -109,13 +109,11 @@ func exportTemplate(filePath string) error {
 			{
 				ID:        1,
 				Username:  "user1",
-				Email:     "user1@example.com",
 				CreatedAt: now,
 			},
 			{
 				ID:        2,
 				Username:  "user2",
-				Email:     "user2@example.com",
 				CreatedAt: now.Add(time.Minute),
 			},
 		},

@@ -126,18 +126,6 @@ func (us *UserMemoryStore) GetByUsername(username string) (*domain.User, bool) {
 	return nil, false
 }
 
-func (us *UserMemoryStore) GetByEmail(email string) (*domain.User, bool) {
-	us.mu.RLock()
-	defer us.mu.RUnlock()
-
-	for _, user := range us.users {
-		if user.Email == email {
-			return user, true
-		}
-	}
-	return nil, false
-}
-
 func (us *UserMemoryStore) Create(user *domain.User) *domain.User {
 	us.mu.Lock()
 	defer us.mu.Unlock()
