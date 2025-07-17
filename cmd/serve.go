@@ -15,6 +15,7 @@ var jsonFilePath string
 var jwtKeyMode string
 var jwtSecretKey string
 var authRequired bool
+var authMode string
 
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
@@ -22,7 +23,7 @@ var serveCmd = &cobra.Command{
 	Short: "Start the mock TODO server",
 	Long:  `Start the mock TODO server that provides REST API endpoints for managing tasks.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := server.Run(port, jsonFilePath, jwtKeyMode, jwtSecretKey, authRequired); err != nil {
+		if err := server.Run(port, jsonFilePath, jwtKeyMode, jwtSecretKey, authRequired, authMode); err != nil {
 			log.Fatal("Failed to start server:", err)
 		}
 	},
@@ -35,4 +36,5 @@ func init() {
 	serveCmd.Flags().StringVar(&jwtKeyMode, "jwt-key-mode", "secret", "JWT key mode: 'secret' or 'rsa'")
 	serveCmd.Flags().StringVar(&jwtSecretKey, "jwt-secret", "test-secret-key", "JWT secret key (used when jwt-key-mode is 'secret')")
 	serveCmd.Flags().BoolVarP(&authRequired, "auth-required", "a", true, "Require authentication for task API endpoints")
+	serveCmd.Flags().StringVar(&authMode, "auth-mode", "jwt", "Authentication mode: 'jwt', 'session', or 'both'")
 }

@@ -23,3 +23,5 @@ go.work
 
 # Added by goreleaser init:
 dist/
+
+mock-todo-server-portal
