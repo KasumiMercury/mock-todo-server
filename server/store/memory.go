@@ -1,36 +1,29 @@
-package server
+package store
 
 import (
+	"github.com/KasumiMercury/mock-todo-server/server/domain"
 	"sync"
 	"time"
 )
 
-type Task struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Completed   bool   `json:"completed"`
-	CreatedAt   string `json:"created_at"`
-}
-
-type TaskStore struct {
-	tasks  map[int]*Task
+type TaskMemoryStore struct {
+	tasks  map[int]*domain.Task
 	nextID int
 	mu     sync.RWMutex
 }
 
-func NewTaskStore() *TaskStore {
-	return &TaskStore{
-		tasks:  make(map[int]*Task),
+func NewTaskMemoryStore() *TaskMemoryStore {
+	return &TaskMemoryStore{
+		tasks:  make(map[int]*domain.Task),
 		nextID: 1,
 	}
 }
 
-func (ts *TaskStore) GetAll() []*Task {
+func (ts *TaskMemoryStore) GetAll() []*domain.Task {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
-	tasks := make([]*Task, 0, len(ts.tasks))
+	tasks := make([]*domain.Task, 0, len(ts.tasks))
 	for _, task := range ts.tasks {
 		tasks = append(tasks, task)
 	}
@@ -38,7 +31,7 @@ func (ts *TaskStore) GetAll() []*Task {
 	return tasks
 }
 
-func (ts *TaskStore) GetByID(id int) (*Task, bool) {
+func (ts *TaskMemoryStore) GetByID(id int) (*domain.Task, bool) {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
@@ -46,7 +39,7 @@ func (ts *TaskStore) GetByID(id int) (*Task, bool) {
 	return task, exists
 }
 
-func (ts *TaskStore) Create(task *Task) *Task {
+func (ts *TaskMemoryStore) Create(task *domain.Task) *domain.Task {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
@@ -58,7 +51,7 @@ func (ts *TaskStore) Create(task *Task) *Task {
 	return task
 }
 
-func (ts *TaskStore) Update(id int, updatedTask *Task) (*Task, bool) {
+func (ts *TaskMemoryStore) Update(id int, updatedTask *domain.Task) (*domain.Task, bool) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
@@ -74,7 +67,7 @@ func (ts *TaskStore) Update(id int, updatedTask *Task) (*Task, bool) {
 	return updatedTask, true
 }
 
-func (ts *TaskStore) Delete(id int) bool {
+func (ts *TaskMemoryStore) Delete(id int) bool {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 

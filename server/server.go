@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	taskStore "github.com/KasumiMercury/mock-todo-server/server/store"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +18,7 @@ import (
 type Server struct {
 	engine  *gin.Engine
 	server  *http.Server
-	store   *TaskStore
+	store   *taskStore.TaskStore
 	handler *TaskHandler
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -25,19 +26,27 @@ type Server struct {
 
 var serverInstance *Server
 
-func NewServer() *Server {
+func NewServer(filePath string) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
-	store := NewTaskStore()
+	var store taskStore.TaskStore
+
+	if filePath == "" {
+		store = taskStore.NewTaskMemoryStore()
+	} else {
+		store = taskStore.NewTaskFileStore(filePath)
+		log.Printf("Using file store at %s", filePath)
+	}
+	//memoryStore := taskStore.NewTaskMemoryStore()
 	handler := NewTaskHandler(store)
 
 	return &Server{
 		engine:  engine,
-		store:   store,
+		store:   &store,
 		handler: handler,
 		ctx:     ctx,
 		cancel:  cancel,
@@ -55,12 +64,12 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-func Run(port int) error {
+func Run(port int, filePath string) error {
 	if pid.CheckRunning() {
 		return fmt.Errorf("server is already running")
 	}
 
-	serverInstance = NewServer()
+	serverInstance = NewServer(filePath)
 	serverInstance.setupRoutes()
 
 	addr := fmt.Sprintf(":%d", port)

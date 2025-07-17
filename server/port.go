@@ -1,6 +1,8 @@
 package server
 
 import (
+	"github.com/KasumiMercury/mock-todo-server/server/domain"
+	taskStore "github.com/KasumiMercury/mock-todo-server/server/store"
 	"net/http"
 	"strconv"
 
@@ -8,10 +10,10 @@ import (
 )
 
 type TaskHandler struct {
-	store *TaskStore
+	store taskStore.TaskStore
 }
 
-func NewTaskHandler(store *TaskStore) *TaskHandler {
+func NewTaskHandler(store taskStore.TaskStore) *TaskHandler {
 	return &TaskHandler{
 		store: store,
 	}
@@ -23,7 +25,7 @@ func (h *TaskHandler) GetTasks(c *gin.Context) {
 }
 
 func (h *TaskHandler) CreateTask(c *gin.Context) {
-	var task Task
+	var task domain.Task
 	if err := c.ShouldBindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
@@ -58,7 +60,7 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
-	var updatedTask Task
+	var updatedTask domain.Task
 	if err := c.ShouldBindJSON(&updatedTask); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
