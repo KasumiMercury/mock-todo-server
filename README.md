@@ -43,7 +43,7 @@ Output a template for file storage:
 ./mock-todo-server serve -p 3000
 
 # Start the server without authentication
-./mock-todo-server serve -a false
+./mock-todo-server serve -a=false
 
 # Start the server with session-based authentication
 ./mock-todo-server serve --auth-mode session

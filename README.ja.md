@@ -43,7 +43,7 @@
 ./mock-todo-server serve -p 3000
 
 # 認証なしでサーバーを起動
-./mock-todo-server serve -a false
+./mock-todo-server serve -a=false
 
 # セッションベース認証でサーバーを起動
 ./mock-todo-server serve --auth-mode session
