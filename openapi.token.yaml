@@ -1,0 +1,596 @@
+openapi: 3.0.3
+info:
+  title: Mock TODO Server API (Token Authentication)
+  description: A mock TODO server that provides REST API endpoints for managing tasks with user authentication (JWT Token).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive JWT token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Register a new user account.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request body or username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Logout user. In JWT mode, this is a no-op on the server side.
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user information
+      description: Get information about the currently authenticated user.
+      responses:
+        '200':
+          description: User information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/jwks:
+    get:
+      tags:
+        - Authentication
+      summary: Get JSON Web Key Set
+      description: Get the JSON Web Key Set for JWT token validation.
+      security: []
+      responses:
+        '200':
+          description: JWKS retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKSet'
+        '400':
+          description: JWKS not available (only available in RSA mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /.well-known/jwks.json:
+    get:
+      tags:
+        - Authentication
+      summary: Get JSON Web Key Set (standard endpoint)
+      description: Standard OpenID Connect endpoint for JWT validation.
+      security: []
+      responses:
+        '200':
+          description: JWKS retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKSet'
+        '400':
+          description: JWKS not available (only available in RSA mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /.well-known/openid_configuration:
+    get:
+      tags:
+        - Authentication
+      summary: Get OpenID Connect configuration
+      description: Standard OpenID Connect discovery endpoint.
+      security: []
+      responses:
+        '200':
+          description: OpenID configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenIDConfiguration'
+
+  /tasks:
+    get:
+      tags:
+        - Tasks
+      summary: Get all tasks
+      description: Retrieve all tasks belonging to the authenticated user.
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task
+      description: Create a new task associated with the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tasks/{id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get task by ID
+      description: Retrieve a specific task by its ID. Users can only access their own tasks.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid task ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied (task doesn't belong to user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Tasks
+      summary: Update task
+      description: Update a specific task by its ID. Users can only update their own tasks.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid task ID or request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied (task doesn't belong to user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Tasks
+      summary: Delete task
+      description: Delete a specific task by its ID. Users can only delete their own tasks.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Task ID
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '204':
+          description: Task deleted successfully
+        '400':
+          description: Invalid task ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied (task doesn't belong to user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique task identifier
+          example: 1
+        title:
+          type: string
+          description: Task title
+          example: "Complete project documentation"
+        user_id:
+          type: integer
+          description: ID of the user who owns this task
+          example: 1
+        created_at:
+          type: string
+          description: Task creation timestamp
+          example: "2023-01-01T00:00:00Z"
+      required:
+        - id
+        - title
+        - user_id
+        - created_at
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+          example: 1
+        username:
+          type: string
+          description: Username
+          example: "john_doe"
+        created_at:
+          type: string
+          format: date-time
+          description: User creation timestamp
+          example: "2023-01-01T00:00:00Z"
+      required:
+        - id
+        - username
+        - created_at
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username
+          example: "john_doe"
+        password:
+          type: string
+          description: Password
+          example: "password123"
+      required:
+        - username
+        - password
+
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username
+          example: "john_doe"
+        password:
+          type: string
+          description: Password (minimum 6 characters)
+          example: "password123"
+          minLength: 6
+      required:
+        - username
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token for authentication
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    CreateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Task title
+          example: "Complete project documentation"
+      required:
+        - title
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Updated task title
+          example: "Updated project documentation"
+      required:
+        - title
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid credentials"
+      required:
+        - error
+
+    JWK:
+      type: object
+      properties:
+        kty:
+          type: string
+          description: Key type
+          example: "RSA"
+        use:
+          type: string
+          description: Key usage
+          example: "sig"
+        n:
+          type: string
+          description: RSA modulus
+          example: "0vx7agoebGcQSu..."
+        e:
+          type: string
+          description: RSA exponent
+          example: "AQAB"
+        kid:
+          type: string
+          description: Key ID
+          example: "rsa-key-1"
+      required:
+        - kty
+        - use
+        - n
+        - e
+        - kid
+
+    JWKSet:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/JWK'
+      required:
+        - keys
+
+    OpenIDConfiguration:
+      type: object
+      properties:
+        issuer:
+          type: string
+          description: Issuer identifier
+          example: "http://localhost:8080"
+        authorization_endpoint:
+          type: string
+          description: Authorization endpoint
+          example: "http://localhost:8080/auth/authorize"
+        token_endpoint:
+          type: string
+          description: Token endpoint
+          example: "http://localhost:8080/auth/token"
+        userinfo_endpoint:
+          type: string
+          description: Userinfo endpoint
+          example: "http://localhost:8080/auth/me"
+        jwks_uri:
+          type: string
+          description: JWKS endpoint URI
+          example: "http://localhost:8080/.well-known/jwks.json"
+        response_types_supported:
+          type: array
+          items:
+            type: string
+          example: ["code", "token", "id_token", "code token", "code id_token", "token id_token", "code token id_token"]
+        subject_types_supported:
+          type: array
+          items:
+            type: string
+          example: ["public"]
+        id_token_signing_alg_values_supported:
+          type: array
+          items:
+            type: string
+          example: ["RS256", "HS256"]
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+          example: ["client_secret_post", "client_secret_basic"]
+      required:
+        - issuer
+        - authorization_endpoint
+        - token_endpoint
+        - userinfo_endpoint
+        - jwks_uri
+        - response_types_supported
+        - subject_types_supported
+        - id_token_signing_alg_values_supported
+        - token_endpoint_auth_methods_supported
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Tasks
+    description: Task management endpoints
