@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +18,9 @@ import (
 	"github.com/KasumiMercury/mock-todo-server/server/store"
 	"github.com/gin-gonic/gin"
 )
+
+//go:embed templates
+var templates embed.FS
 
 type Server struct {
 	engine       *gin.Engine
@@ -75,7 +80,8 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 		oidcHandler = auth.NewOIDCHandler(oidcService, authService)
 
 		// Load HTML templates for OIDC
-		engine.LoadHTMLGlob("templates/*")
+		t := template.Must(template.ParseFS(templates, "templates/*.html"))
+		engine.SetHTMLTemplate(t)
 	}
 
 	return &Server{
