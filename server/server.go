@@ -69,10 +69,10 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 			cancel()
 			return nil, fmt.Errorf("failed to load OIDC config: %w", err)
 		}
-		
+
 		oidcService := auth.NewOIDCService(oidcConfig, userStore, authService)
 		oidcHandler = auth.NewOIDCHandler(oidcService, authService)
-		
+
 		// Load HTML templates for OIDC
 		engine.LoadHTMLGlob("templates/*")
 	}
@@ -156,50 +156,24 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool, authModeStr string, oidcConfigPath string) error {
+func Run(config *Config) error {
 	if pid.CheckRunning() {
 		return fmt.Errorf("server is already running")
 	}
 
-	var jwtKeyMode auth.JWTKeyMode
-	switch keyMode {
-	case "secret":
-		jwtKeyMode = auth.JWTKeyModeSecret
-	case "rsa":
-		jwtKeyMode = auth.JWTKeyModeRSA
-	default:
-		return fmt.Errorf("invalid jwt-key-mode: %s (must be 'secret' or 'rsa')", keyMode)
-	}
-
-	var authMode auth.AuthMode
-	switch authModeStr {
-	case "jwt":
-		authMode = auth.AuthModeJWT
-	case "session":
-		authMode = auth.AuthModeSession
-	case "both":
-		authMode = auth.AuthModeBoth
-	case "oidc":
-		authMode = auth.AuthModeOIDC
-		// OIDC mode requires config file
-		if oidcConfigPath == "" {
-			log.Println("OIDC config file path is required when using auth-mode=oidc")
-			log.Println("Please specify --oidc-config-path flag with path to JSON configuration file")
-			return fmt.Errorf("OIDC config file path is required")
-		}
-	default:
-		return fmt.Errorf("invalid auth-mode: %s (must be 'jwt', 'session', 'both', or 'oidc')", authModeStr)
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	var err error
-	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired, authMode, oidcConfigPath)
+	serverInstance, err = NewServer(config.JsonFilePath, config.JWTKeyMode, config.JWTSecretKey, config.AuthRequired, config.AuthMode, config.OIDCConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
 	serverInstance.setupRoutes()
 
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", config.Port)
 	serverInstance.server = &http.Server{
 		Addr:    addr,
 		Handler: serverInstance.engine,
