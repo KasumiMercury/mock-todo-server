@@ -28,34 +28,10 @@ func Start() {
 			}
 			log.Println("Server stop request sent")
 		case export:
-			// TODO: fix multiple export modes
-			// TODO: fix export to file path
-
-			templateMode, memoryMode, oidcMode := exportForm()
-			if templateMode {
-				err := exportHandler.Template("data-template.json")
-				if err != nil {
-					log.Fatal("Failed to export data template:", err)
-				} else {
-					log.Println("Data template exported successfully to data-template.json")
-				}
-			}
-
-			if memoryMode {
-				err := exportHandler.MemoryState("memory-state.json")
-				if err != nil {
-					log.Fatal("Failed to export memory state:", err)
-				} else {
-					log.Println("Memory state exported successfully to memory-state.json")
-				}
-			}
-
-			if oidcMode {
-				err := exportHandler.OidcTemplate("oidc-config.json")
-				if err != nil {
-					log.Fatal("Failed to export OIDC configuration template:", err)
-				} else {
-					log.Println("OIDC configuration template exported successfully to oidc-config.json")
+			exportConfigs := exportForm()
+			for _, config := range exportConfigs {
+				if err := exportHandler.ExportWithMode(config.Mode, config.FilePath); err != nil {
+					log.Printf("Failed to export %s: %v", config.Mode, err)
 				}
 			}
 		case exit:
@@ -75,6 +51,11 @@ const (
 	export
 	exit
 )
+
+type ExportConfig struct {
+	Mode     exportHandler.ExportMode
+	FilePath string
+}
 
 func commandSelector() command {
 	var selectedCommand command
@@ -208,35 +189,65 @@ func serveForm() *server.Config {
 	return config
 }
 
-func exportForm() (bool, bool, bool) {
-	var templateMode, memoryMode, oidcMode bool
+func exportForm() []ExportConfig {
+	var configs []ExportConfig
 
-	templateConfirm := huh.NewConfirm().
-		Title("Export JSON template?").
-		Affirmative("Yes").
-		Negative("No").
-		Value(&templateMode)
-	if err := templateConfirm.Run(); err != nil {
-		log.Fatal("Failed to confirm template export:", err)
+	var selectedModes []exportHandler.ExportMode
+	modeSelector := huh.NewMultiSelect[exportHandler.ExportMode]().
+		Title("Select export modes").
+		Options(
+			huh.NewOption("JSON Data Template", exportHandler.TemplateMode),
+			huh.NewOption("Memory State", exportHandler.MemoryExportMode),
+			huh.NewOption("OIDC Configuration Template", exportHandler.OidcMode),
+		).
+		Value(&selectedModes)
+	if err := modeSelector.Run(); err != nil {
+		log.Fatal("Failed to select export modes:", err)
 	}
 
-	memoryConfirm := huh.NewConfirm().
-		Title("Export current memory store state?").
-		Affirmative("Yes").
-		Negative("No").
-		Value(&memoryMode)
-	if err := memoryConfirm.Run(); err != nil {
-		log.Fatal("Failed to confirm memory export:", err)
+	for _, mode := range selectedModes {
+		filePath := ""
+
+		filePathInput := huh.NewInput().
+			TitleFunc(
+				func() string {
+					switch mode {
+					case exportHandler.TemplateMode:
+						return "JSON Data Template File Path"
+					case exportHandler.MemoryExportMode:
+						return "Memory State File Path"
+					case exportHandler.OidcMode:
+						return "OIDC Configuration Template File Path"
+					default:
+						log.Fatal("Unknown mode:", mode)
+						return ""
+					}
+				}, &mode).
+			Description("leave empty for default file path").
+			Prompt("Enter file path:").
+			PlaceholderFunc(func() string {
+				switch mode {
+				case exportHandler.TemplateMode:
+					return exportHandler.DefaultTemplateFile
+				case exportHandler.MemoryExportMode:
+					return exportHandler.DefaultMemoryFile
+				case exportHandler.OidcMode:
+					return exportHandler.DefaultOidcFile
+				default:
+					log.Fatal("Unknown mode:", mode)
+					return ""
+				}
+			}, &mode).
+			Value(&filePath)
+		if err := filePathInput.Run(); err != nil {
+			log.Fatal("Failed to get file path input:", err)
+		}
+
+		configs = append(configs, ExportConfig{
+			Mode:     mode,
+			FilePath: filePath,
+		})
 	}
 
-	oidcConfirm := huh.NewConfirm().
-		Title("Export OIDC configuration template?").
-		Affirmative("Yes").
-		Negative("No").
-		Value(&oidcMode)
-	if err := oidcConfirm.Run(); err != nil {
-		log.Fatal("Failed to confirm OIDC export:", err)
-	}
-
-	return templateMode, memoryMode, oidcMode
+	return configs
 }

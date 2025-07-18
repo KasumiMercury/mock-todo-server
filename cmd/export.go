@@ -64,12 +64,7 @@ Examples:
 			os.Exit(1)
 		}
 
-		if err := export.Export(
-			args,
-			templateMode,
-			memoryMode,
-			oidcMode,
-		); err != nil {
+		if err := export.Export(args, templateMode, memoryMode, oidcMode); err != nil {
 			fmt.Printf("Error exporting data: %v\n", err)
 		}
 	},

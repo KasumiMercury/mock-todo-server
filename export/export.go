@@ -6,10 +6,25 @@ import (
 	"github.com/KasumiMercury/mock-todo-server/pid"
 	"github.com/KasumiMercury/mock-todo-server/server/domain"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+)
+
+type ExportMode string
+
+const (
+	TemplateMode     ExportMode = "template"
+	MemoryExportMode ExportMode = "memory"
+	OidcMode         ExportMode = "oidc"
+)
+
+const (
+	DefaultTemplateFile = "data.json"
+	DefaultMemoryFile   = "memory-state.json"
+	DefaultOidcFile     = "oidc-config.json"
 )
 
 type ServerProvider interface {
@@ -39,21 +54,48 @@ type FileData struct {
 
 func Export(args []string, templateMode, memoryMode, oidcMode bool) error {
 	if templateMode {
-		filePath := GetOutputPath(args, "data-template.json")
+		filePath := GetOutputPath(args, DefaultTemplateFile)
 		return Template(filePath)
 	}
 
 	if memoryMode {
-		filePath := GetOutputPath(args, "memory-state.json")
+		filePath := GetOutputPath(args, DefaultMemoryFile)
 		return MemoryState(filePath)
 	}
 
 	if oidcMode {
-		filePath := GetOutputPath(args, "oidc-config.json")
+		filePath := GetOutputPath(args, DefaultOidcFile)
 		return OidcTemplate(filePath)
 	}
 
 	return fmt.Errorf("no valid export mode specified")
+}
+
+// ExportWithMode exports data based on the specified mode and file path.
+func ExportWithMode(mode ExportMode, filePath string) error {
+	if filePath == "" {
+		switch mode {
+		case TemplateMode:
+			filePath = DefaultTemplateFile
+		case MemoryExportMode:
+			filePath = DefaultMemoryFile
+		case OidcMode:
+			filePath = DefaultOidcFile
+		default:
+			return fmt.Errorf("unknown export mode: %s", mode)
+		}
+	}
+
+	switch mode {
+	case TemplateMode:
+		return Template(filePath)
+	case MemoryExportMode:
+		return MemoryState(filePath)
+	case OidcMode:
+		return OidcTemplate(filePath)
+	default:
+		return fmt.Errorf("unknown export mode: %s", mode)
+	}
 }
 
 func GetOutputPath(args []string, defaultFilename string) string {
@@ -108,6 +150,8 @@ func Template(filePath string) error {
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write template file: %w", err)
 	}
+
+	log.Println("Template file created at:", filePath)
 
 	return nil
 }
@@ -193,6 +237,7 @@ func saveMemoryStateToFile(data *FileData, filePath string) error {
 		return fmt.Errorf("failed to write memory state file: %w", err)
 	}
 
+	log.Println("Memory state file exported to:", filePath)
 	return nil
 }
 
@@ -226,5 +271,6 @@ func OidcTemplate(filePath string) error {
 		return fmt.Errorf("failed to write OIDC template file: %w", err)
 	}
 
+	log.Println("OIDC configuration template exported to:", filePath)
 	return nil
 }
