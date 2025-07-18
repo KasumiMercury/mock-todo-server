@@ -20,6 +20,7 @@ import (
 var (
 	templateMode bool
 	memoryMode   bool
+	oidcMode     bool
 )
 
 type FileData struct {
@@ -30,15 +31,21 @@ type FileData struct {
 // exportCmd represents the export command
 var exportCmd = &cobra.Command{
 	Use:   "export [file-path]",
-	Short: "Export JSON template or current memory store state",
-	Long: `Export a JSON template file for use with the server's -f flag, or export the current memory store state.
+	Short: "Export JSON template, OIDC config template, or current memory store state",
+	Long: `Export a JSON template file for use with the server's -f flag, OIDC configuration template, or export the current memory store state.
 
 Examples:
-  # Export template to current directory as data.json
+  # Export data template to current directory as data.json
   mock-todo-server export --template
 
-  # Export template to specific file
+  # Export data template to specific file
   mock-todo-server export --template /path/to/template.json
+
+  # Export OIDC configuration template
+  mock-todo-server export --oidc-config
+
+  # Export OIDC config template to specific file
+  mock-todo-server export --oidc-config /path/to/oidc-config.json
 
   # Export current memory store state
   mock-todo-server export --memory
@@ -46,28 +53,47 @@ Examples:
   # Export memory state to specific file
   mock-todo-server export --memory backup.json`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if !templateMode && !memoryMode {
-			fmt.Println("Error: Must specify either --template or --memory flag")
-			os.Exit(1)
-		}
-
-		if templateMode && memoryMode {
-			fmt.Println("Error: Cannot specify both --template and --memory flags")
-			os.Exit(1)
-		}
-
-		filePath := getOutputPath(args)
-
+		// Count active flags
+		activeFlags := 0
 		if templateMode {
+			activeFlags++
+		}
+		if memoryMode {
+			activeFlags++
+		}
+		if oidcMode {
+			activeFlags++
+		}
+
+		if activeFlags == 0 {
+			fmt.Println("Error: Must specify one of --template, --memory, or --oidc-config flag")
+			os.Exit(1)
+		}
+
+		if activeFlags > 1 {
+			fmt.Println("Error: Cannot specify multiple export flags simultaneously")
+			os.Exit(1)
+		}
+
+		var filePath string
+		if templateMode {
+			filePath = getOutputPath(args, "data.json")
 			if err := exportTemplate(filePath); err != nil {
 				log.Fatalf("Failed to export template: %v", err)
 			}
-			fmt.Printf("Template exported to: %s\n", filePath)
+			fmt.Printf("Data template exported to: %s\n", filePath)
 		} else if memoryMode {
+			filePath = getOutputPath(args, "data.json")
 			if err := exportMemoryState(filePath); err != nil {
 				log.Fatalf("Failed to export memory state: %v", err)
 			}
 			fmt.Printf("Memory state exported to: %s\n", filePath)
+		} else if oidcMode {
+			filePath = getOutputPath(args, "oidc-config.json")
+			if err := exportOIDCTemplate(filePath); err != nil {
+				log.Fatalf("Failed to export OIDC template: %v", err)
+			}
+			fmt.Printf("OIDC configuration template exported to: %s\n", filePath)
 		}
 	},
 }
@@ -75,16 +101,17 @@ Examples:
 func init() {
 	rootCmd.AddCommand(exportCmd)
 
-	exportCmd.Flags().BoolVarP(&templateMode, "template", "t", false, "Export JSON template file")
+	exportCmd.Flags().BoolVarP(&templateMode, "template", "t", false, "Export JSON data template file")
 	exportCmd.Flags().BoolVarP(&memoryMode, "memory", "m", false, "Export current memory store state")
+	exportCmd.Flags().BoolVar(&oidcMode, "oidc-config", false, "Export OIDC configuration template")
 }
 
-func getOutputPath(args []string) string {
+func getOutputPath(args []string, defaultFilename string) string {
 	if len(args) > 0 {
 		return args[0]
 	}
 
-	return "data.json"
+	return defaultFilename
 }
 
 func exportTemplate(filePath string) error {
@@ -172,6 +199,39 @@ func exportMemoryState(filePath string) error {
 
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write memory state file: %w", err)
+	}
+
+	return nil
+}
+
+// exportOIDCTemplate exports an OIDC configuration template
+func exportOIDCTemplate(filePath string) error {
+	oidcTemplate := map[string]interface{}{
+		"client_id":     "mock-client-id-12345",
+		"client_secret": "mock-client-secret-67890",
+		"redirect_uris": []string{
+			"http://localhost:3000/callback",
+			"http://localhost:3000/auth/callback",
+			"https://your-app.example.com/callback",
+		},
+		"issuer": "http://localhost:8080",
+		"scopes": []string{
+			"openid",
+			"profile",
+		},
+	}
+
+	data, err := json.MarshalIndent(oidcTemplate, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal OIDC template: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write OIDC template file: %w", err)
 	}
 
 	return nil
