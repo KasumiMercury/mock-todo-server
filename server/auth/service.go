@@ -88,6 +88,11 @@ func (s *AuthService) GenerateToken(user *domain.User) (string, error) {
 		"exp":  now.Add(24 * time.Hour).Unix(),
 	}
 
+	return s.generateJWTWithClaims(claims)
+}
+
+// generateJWTWithClaims generates a JWT token with custom claims
+func (s *AuthService) generateJWTWithClaims(claims jwt.MapClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	switch s.keyMode {

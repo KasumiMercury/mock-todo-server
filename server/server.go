@@ -24,6 +24,7 @@ type Server struct {
 	authService  *auth.AuthService
 	taskHandler  *TaskHandler
 	authHandler  *auth.AuthHandler
+	oidcHandler  *auth.OIDCHandler
 	authRequired bool
 	authMode     auth.AuthMode
 	ctx          context.Context
@@ -32,7 +33,7 @@ type Server struct {
 
 var serverInstance *Server
 
-func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authRequired bool, authMode auth.AuthMode) (*Server, error) {
+func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authRequired bool, authMode auth.AuthMode, oidcConfigPath string) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	gin.SetMode(gin.ReleaseMode)
@@ -60,6 +61,22 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 	taskHandler := NewTaskHandler(taskStore, authRequired)
 	authHandler := auth.NewAuthHandler(authService, authMode)
 
+	// Create OIDC handler if OIDC mode is enabled
+	var oidcHandler *auth.OIDCHandler
+	if authMode == auth.AuthModeOIDC {
+		oidcConfig, err := auth.LoadOIDCConfig(oidcConfigPath)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to load OIDC config: %w", err)
+		}
+		
+		oidcService := auth.NewOIDCService(oidcConfig, userStore, authService)
+		oidcHandler = auth.NewOIDCHandler(oidcService, authService)
+		
+		// Load HTML templates for OIDC
+		engine.LoadHTMLGlob("templates/*")
+	}
+
 	return &Server{
 		engine:       engine,
 		taskStore:    taskStore,
@@ -67,6 +84,7 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 		authService:  authService,
 		taskHandler:  taskHandler,
 		authHandler:  authHandler,
+		oidcHandler:  oidcHandler,
 		authRequired: authRequired,
 		authMode:     authMode,
 		ctx:          ctx,
@@ -78,17 +96,31 @@ func (s *Server) setupRoutes() {
 	// Authentication routes (no auth required)
 	authGroup := s.engine.Group("/auth")
 	{
-		authGroup.POST("/login", s.authHandler.Login)
-		authGroup.POST("/register", s.authHandler.Register)
-		authGroup.POST("/logout", s.authHandler.Logout)
-		authGroup.GET("/jwks", s.authHandler.GetJWKs)
+		if s.authMode == auth.AuthModeOIDC {
+			// OIDC specific routes
+			authGroup.GET("/authorize", s.oidcHandler.Authorize)
+			authGroup.POST("/authorize", s.oidcHandler.Authorize)
+			authGroup.POST("/token", s.oidcHandler.Token)
+			authGroup.GET("/userinfo", s.oidcHandler.UserInfo)
+			authGroup.GET("/jwks", s.authHandler.GetJWKs)
+		} else {
+			// Standard auth routes
+			authGroup.POST("/login", s.authHandler.Login)
+			authGroup.POST("/register", s.authHandler.Register)
+			authGroup.POST("/logout", s.authHandler.Logout)
+			authGroup.GET("/jwks", s.authHandler.GetJWKs)
+		}
 	}
 
 	// Standard well-known endpoints (no auth required)
 	wellKnownGroup := s.engine.Group("/.well-known")
 	{
 		wellKnownGroup.GET("/jwks.json", s.authHandler.GetJWKs)
-		wellKnownGroup.GET("/openid_configuration", s.authHandler.GetOpenIDConfiguration)
+		if s.authMode == auth.AuthModeOIDC {
+			wellKnownGroup.GET("/openid_configuration", s.oidcHandler.GetOpenIDConfiguration)
+		} else {
+			wellKnownGroup.GET("/openid_configuration", s.authHandler.GetOpenIDConfiguration)
+		}
 	}
 
 	if s.authRequired {
@@ -124,7 +156,7 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool, authModeStr string) error {
+func Run(port int, filePath string, keyMode string, secretKey string, authRequired bool, authModeStr string, oidcConfigPath string) error {
 	if pid.CheckRunning() {
 		return fmt.Errorf("server is already running")
 	}
@@ -147,12 +179,20 @@ func Run(port int, filePath string, keyMode string, secretKey string, authRequir
 		authMode = auth.AuthModeSession
 	case "both":
 		authMode = auth.AuthModeBoth
+	case "oidc":
+		authMode = auth.AuthModeOIDC
+		// OIDC mode requires config file
+		if oidcConfigPath == "" {
+			log.Println("OIDC config file path is required when using auth-mode=oidc")
+			log.Println("Please specify --oidc-config-path flag with path to JSON configuration file")
+			return fmt.Errorf("OIDC config file path is required")
+		}
 	default:
-		return fmt.Errorf("invalid auth-mode: %s (must be 'jwt', 'session', or 'both')", authModeStr)
+		return fmt.Errorf("invalid auth-mode: %s (must be 'jwt', 'session', 'both', or 'oidc')", authModeStr)
 	}
 
 	var err error
-	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired, authMode)
+	serverInstance, err = NewServer(filePath, jwtKeyMode, secretKey, authRequired, authMode, oidcConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

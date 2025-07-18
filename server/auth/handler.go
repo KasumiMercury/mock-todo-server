@@ -13,6 +13,7 @@ const (
 	AuthModeJWT     AuthMode = "jwt"
 	AuthModeSession AuthMode = "session"
 	AuthModeBoth    AuthMode = "both"
+	AuthModeOIDC    AuthMode = "oidc"
 )
 
 type AuthHandler struct {

@@ -19,6 +19,8 @@ func AuthMiddleware(authService *AuthService, authMode AuthMode) gin.HandlerFunc
 			userID, authenticated = authenticateWithSession(c, authService)
 		case AuthModeBoth:
 			userID, authenticated = authenticateWithBoth(c, authService)
+		case AuthModeOIDC:
+			userID, authenticated = authenticateWithJWT(c, authService) // OIDC uses JWT tokens
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid auth mode"})
 			c.Abort()
