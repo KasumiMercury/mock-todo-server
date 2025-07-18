@@ -1,6 +1,6 @@
 # Mock TODO Server
 
-A mock TODO server that provides REST API endpoints for task management with flexible authentication support.
+A sophisticated Go-based mock TODO server that provides REST API endpoints for task management with comprehensive authentication support. Designed for testing OAuth2/OIDC clients and various authentication scenarios in development environments.
 
 ## Quick Start
 
@@ -13,15 +13,20 @@ Start the server with default settings:
 
 By default, it starts with JWT authentication enabled on port 8080.
 
+### Interactive Mode
+
+Use interactive mode for guided configuration:
+```bash
+./mock-todo-server
+```
+
+This launches an interactive CLI that guides you through server configuration with helpful prompts and explanations.
+
+### Basic Operations
+
 Stop the server:
 ```bash
 ./mock-todo-server stop
-```
-
-By default, data is lost when the server stops.
-To persist data, use file storage:
-```bash
-./mock-todo-server serve -f data.json
 ```
 
 Export the current memory state to a JSON file:
@@ -32,6 +37,14 @@ Export the current memory state to a JSON file:
 Output a template for file storage:
 ```bash
 ./mock-todo-server export --template
+```
+
+### Data Persistence
+
+By default, data is stored in memory and lost when the server stops.
+To persist data, use file storage:
+```bash
+./mock-todo-server serve -f data.json
 ```
 
 ### Command-Line Options
@@ -284,3 +297,18 @@ JSON format for file storage:
 }
 ```
 
+## Use Cases
+
+### Development and Testing
+
+- **Frontend Development**: Mock backend for React/Vue/Angular applications
+- **OAuth2/OIDC Testing**: Test OAuth2 and OpenID Connect client implementations
+- **API Testing**: Reliable endpoint for automated testing and CI/CD pipelines
+- **Authentication Testing**: Test different authentication flows and scenarios
+- **Mobile App Development**: Mock API for mobile application development
+
+### Demo and Prototyping
+
+- **API Demonstrations**: Showcase REST API patterns and authentication flows
+- **Educational Purposes**: Learn OAuth2/OIDC concepts with a working implementation
+- **Rapid Prototyping**: Quick backend setup for proof-of-concept projects
