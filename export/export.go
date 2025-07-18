@@ -3,6 +3,7 @@ package export
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/KasumiMercury/mock-todo-server/pid"
 	"github.com/KasumiMercury/mock-todo-server/server/domain"
 	"io"
 	"net/http"
@@ -10,6 +11,26 @@ import (
 	"path/filepath"
 	"time"
 )
+
+type ServerProvider interface {
+	GetMemoryState() (*FileData, error)
+}
+
+var serverProvider ServerProvider
+
+func SetServerProvider(provider ServerProvider) {
+	serverProvider = provider
+}
+
+func getServerPort() int {
+	// Try to get port from server info file
+	if serverInfo, err := pid.GetServerInfo(); err == nil {
+		return serverInfo.Port
+	}
+
+	// Fallback to default port if server info is not available
+	return 8080
+}
 
 type FileData struct {
 	Tasks []*domain.Task `json:"tasks"`
@@ -92,7 +113,21 @@ func Template(filePath string) error {
 }
 
 func MemoryState(filePath string) error {
-	resp, err := http.Get("http://localhost:8080/tasks")
+	// Try to get memory state from server instance (if available)
+	if data, err := getMemoryStateFromServer(); err == nil {
+		return saveMemoryStateToFile(data, filePath)
+	}
+
+	// Try to get memory state from internal API endpoint
+	if data, err := getMemoryStateFromInternalAPI(); err == nil {
+		return saveMemoryStateToFile(data, filePath)
+	}
+
+	// Fallback to HTTP request for tasks only (legacy behavior)
+	port := getServerPort()
+	url := fmt.Sprintf("http://localhost:%d/tasks", port)
+
+	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server (is it running?): %w", err)
 	}
@@ -114,9 +149,48 @@ func MemoryState(filePath string) error {
 
 	data := FileData{
 		Tasks: tasks,
-		Users: []*domain.User{},
+		Users: []*domain.User{}, // Still empty when using HTTP fallback
 	}
 
+	return saveMemoryStateToFile(&data, filePath)
+}
+
+func getMemoryStateFromServer() (*FileData, error) {
+	if serverProvider == nil {
+		return nil, fmt.Errorf("server provider not available")
+	}
+
+	return serverProvider.GetMemoryState()
+}
+
+func getMemoryStateFromInternalAPI() (*FileData, error) {
+	port := getServerPort()
+	url := fmt.Sprintf("http://localhost:%d/internal/memory-state", port)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to internal API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("internal API returned status: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read internal API response: %w", err)
+	}
+
+	var data FileData
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("failed to parse internal API response: %w", err)
+	}
+
+	return &data, nil
+}
+
+func saveMemoryStateToFile(data *FileData, filePath string) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal memory state data: %w", err)

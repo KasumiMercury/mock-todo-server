@@ -106,6 +106,18 @@ func NewUserMemoryStore() *UserMemoryStore {
 	}
 }
 
+func (us *UserMemoryStore) GetAll() []*domain.User {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
+
+	users := make([]*domain.User, 0, len(us.users))
+	for _, user := range us.users {
+		users = append(users, user)
+	}
+
+	return users
+}
+
 func (us *UserMemoryStore) GetByID(id int) (*domain.User, bool) {
 	us.mu.RLock()
 	defer us.mu.RUnlock()

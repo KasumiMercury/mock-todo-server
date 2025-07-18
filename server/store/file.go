@@ -289,6 +289,14 @@ func (ts *TaskFileStore) Delete(id int) bool {
 }
 
 // UserFileStore methods
+func (us *UserFileStore) GetAll() []*domain.User {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
+
+	data := us.loadDataFromFile()
+	return data.Users
+}
+
 func (us *UserFileStore) GetByID(id int) (*domain.User, bool) {
 	us.mu.RLock()
 	defer us.mu.RUnlock()

@@ -1,6 +1,7 @@
 package pid
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/adrg/xdg"
 	"log"
@@ -12,8 +13,14 @@ import (
 )
 
 var PidFile string
+var ServerInfoFile string
 
 const appName = "mock-todo-server"
+
+type ServerInfo struct {
+	PID  int `json:"pid"`
+	Port int `json:"port"`
+}
 
 func init() {
 	if runtime.GOOS != "windows" {
@@ -23,6 +30,7 @@ func init() {
 				log.Fatal("failed to create pid directory:", err)
 			}
 			PidFile = pidPath
+			ServerInfoFile = filepath.Join(filepath.Dir(pidPath), appName+".json")
 			log.Println("pid file path:", PidFile)
 			return
 		}
@@ -39,6 +47,7 @@ func init() {
 	}
 
 	PidFile = filepath.Join(appDir, appName+".pid")
+	ServerInfoFile = filepath.Join(appDir, appName+".json")
 	log.Println("pid file path:", PidFile)
 }
 
@@ -67,6 +76,25 @@ func CreatePidFile(pid int) error {
 	return nil
 }
 
+func CreateServerInfoFile(pid, port int) error {
+	serverInfo := ServerInfo{
+		PID:  pid,
+		Port: port,
+	}
+
+	data, err := json.MarshalIndent(serverInfo, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(ServerInfoFile, data, 0600); err != nil {
+		return err
+	}
+
+	log.Printf("server info file created with PID: %d, Port: %d", pid, port)
+	return nil
+}
+
 func GetPid() (int, error) {
 	data, err := os.ReadFile(PidFile)
 	if err != nil {
@@ -79,6 +107,20 @@ func GetPid() (int, error) {
 	}
 
 	return pid, nil
+}
+
+func GetServerInfo() (*ServerInfo, error) {
+	data, err := os.ReadFile(ServerInfoFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var serverInfo ServerInfo
+	if err := json.Unmarshal(data, &serverInfo); err != nil {
+		return nil, err
+	}
+
+	return &serverInfo, nil
 }
 
 func StopByPid() error {
@@ -97,5 +139,12 @@ func StopByPid() error {
 	}
 
 	log.Printf("sent interrupt signal to process %d", pid)
+	return nil
+}
+
+func RemoveServerInfoFile() error {
+	if err := os.Remove(ServerInfoFile); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	return nil
 }
