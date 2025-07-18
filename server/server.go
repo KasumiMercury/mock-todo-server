@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KasumiMercury/mock-todo-server/export"
 	"github.com/KasumiMercury/mock-todo-server/pid"
 	"github.com/KasumiMercury/mock-todo-server/server/auth"
 	"github.com/KasumiMercury/mock-todo-server/server/store"
@@ -92,6 +93,26 @@ func NewServer(filePath string, keyMode auth.JWTKeyMode, secretKey string, authR
 	}, nil
 }
 
+func (s *Server) GetMemoryState() (*export.FileData, error) {
+	tasks := s.taskStore.GetAll()
+	users := s.userStore.GetAll()
+
+	return &export.FileData{
+		Tasks: tasks,
+		Users: users,
+	}, nil
+}
+
+func (s *Server) getMemoryStateHandler(c *gin.Context) {
+	data, err := s.GetMemoryState()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
 func (s *Server) setupRoutes() {
 	// Authentication routes (no auth required)
 	authGroup := s.engine.Group("/auth")
@@ -110,6 +131,12 @@ func (s *Server) setupRoutes() {
 			authGroup.POST("/logout", s.authHandler.Logout)
 			authGroup.GET("/jwks", s.authHandler.GetJWKs)
 		}
+	}
+
+	// Internal API endpoints (no auth required)
+	internalGroup := s.engine.Group("/internal")
+	{
+		internalGroup.GET("/memory-state", s.getMemoryStateHandler)
 	}
 
 	// Standard well-known endpoints (no auth required)
@@ -171,6 +198,9 @@ func Run(config *Config) error {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
+	// Set server instance as export provider
+	export.SetServerProvider(serverInstance)
+
 	serverInstance.setupRoutes()
 
 	addr := fmt.Sprintf(":%d", config.Port)
@@ -181,6 +211,10 @@ func Run(config *Config) error {
 
 	if err := pid.CreatePidFile(os.Getpid()); err != nil {
 		return fmt.Errorf("failed to create PID file: %w", err)
+	}
+
+	if err := pid.CreateServerInfoFile(os.Getpid(), config.Port); err != nil {
+		return fmt.Errorf("failed to create server info file: %w", err)
 	}
 
 	log.Printf("Mock TODO server starting on %s", addr)
@@ -212,6 +246,10 @@ func Run(config *Config) error {
 		log.Printf("Failed to remove PID file: %v", err)
 	}
 
+	if err := pid.RemoveServerInfoFile(); err != nil {
+		log.Printf("Failed to remove server info file: %v", err)
+	}
+
 	log.Println("Server stopped")
 	return nil
 }
@@ -227,4 +265,8 @@ func Stop() error {
 	}
 
 	return pid.StopByPid()
+}
+
+func GetServerInstance() *Server {
+	return serverInstance
 }

@@ -292,7 +292,7 @@ func (h *OIDCHandler) GetOpenIDConfiguration(c *gin.Context) {
 func redirectError(c *gin.Context, redirectURI, errorCode, errorDescription, state string) {
 	redirectURL := fmt.Sprintf("%s?error=%s&error_description=%s",
 		redirectURI, url.QueryEscape(errorCode), url.QueryEscape(errorDescription))
-	
+
 	if state != "" {
 		redirectURL += fmt.Sprintf("&state=%s", url.QueryEscape(state))
 	}
