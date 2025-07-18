@@ -1,6 +1,6 @@
 # Mock TODO Server
 
-A sophisticated Go-based mock TODO server that provides REST API endpoints for task management with comprehensive authentication support. Designed for testing OAuth2/OIDC clients and various authentication scenarios in development environments.
+A Go-based mock TODO server that provides REST API endpoints for task management with comprehensive authentication support. Designed for testing OAuth2/OIDC clients and various authentication scenarios in development environments.
 
 ## Quick Start
 
