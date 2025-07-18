@@ -12,6 +12,7 @@ type TaskStore interface {
 }
 
 type UserStore interface {
+	GetAll() []*domain.User
 	GetByID(id int) (*domain.User, bool)
 	GetByUsername(username string) (*domain.User, bool)
 	Create(user *domain.User) *domain.User
