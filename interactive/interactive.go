@@ -3,6 +3,7 @@ package interactive
 import (
 	"errors"
 	"fmt"
+	exportHandler "github.com/KasumiMercury/mock-todo-server/export"
 	"github.com/KasumiMercury/mock-todo-server/server"
 	"github.com/KasumiMercury/mock-todo-server/server/auth"
 	"github.com/charmbracelet/huh"
@@ -11,8 +12,6 @@ import (
 )
 
 func Start() {
-	//var service InteractiveService
-
 	for {
 		selectedCommand := commandSelector()
 
@@ -23,9 +22,42 @@ func Start() {
 				log.Fatal("Failed to start server:", err)
 			}
 		case stop:
-			//service.stop()
+			err := server.Stop()
+			if err != nil {
+				log.Fatal("Failed to stop server:", err)
+			}
+			log.Println("Server stop request sent")
 		case export:
-			//service.export()
+			// TODO: fix multiple export modes
+			// TODO: fix export to file path
+
+			templateMode, memoryMode, oidcMode := exportForm()
+			if templateMode {
+				err := exportHandler.Template("data-template.json")
+				if err != nil {
+					log.Fatal("Failed to export data template:", err)
+				} else {
+					log.Println("Data template exported successfully to data-template.json")
+				}
+			}
+
+			if memoryMode {
+				err := exportHandler.MemoryState("memory-state.json")
+				if err != nil {
+					log.Fatal("Failed to export memory state:", err)
+				} else {
+					log.Println("Memory state exported successfully to memory-state.json")
+				}
+			}
+
+			if oidcMode {
+				err := exportHandler.OidcTemplate("oidc-config.json")
+				if err != nil {
+					log.Fatal("Failed to export OIDC configuration template:", err)
+				} else {
+					log.Println("OIDC configuration template exported successfully to oidc-config.json")
+				}
+			}
 		case exit:
 			return
 		default:
@@ -174,4 +206,37 @@ func serveForm() *server.Config {
 	}
 
 	return config
+}
+
+func exportForm() (bool, bool, bool) {
+	var templateMode, memoryMode, oidcMode bool
+
+	templateConfirm := huh.NewConfirm().
+		Title("Export JSON template?").
+		Affirmative("Yes").
+		Negative("No").
+		Value(&templateMode)
+	if err := templateConfirm.Run(); err != nil {
+		log.Fatal("Failed to confirm template export:", err)
+	}
+
+	memoryConfirm := huh.NewConfirm().
+		Title("Export current memory store state?").
+		Affirmative("Yes").
+		Negative("No").
+		Value(&memoryMode)
+	if err := memoryConfirm.Run(); err != nil {
+		log.Fatal("Failed to confirm memory export:", err)
+	}
+
+	oidcConfirm := huh.NewConfirm().
+		Title("Export OIDC configuration template?").
+		Affirmative("Yes").
+		Negative("No").
+		Value(&oidcMode)
+	if err := oidcConfirm.Run(); err != nil {
+		log.Fatal("Failed to confirm OIDC export:", err)
+	}
+
+	return templateMode, memoryMode, oidcMode
 }
