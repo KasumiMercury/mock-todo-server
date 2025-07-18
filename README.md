@@ -50,6 +50,9 @@ Output a template for file storage:
 
 # Start the server with RSA JWT signing
 ./mock-todo-server serve --jwt-key-mode rsa
+
+# Start the server with OIDC authentication
+./mock-todo-server serve --auth-mode oidc --oidc-config-path oidc-config.json
 ```
 
 #### Data Export Commands
@@ -66,11 +69,19 @@ Output a template for file storage:
 
 # Export the memory state to a custom file
 ./mock-todo-server export --memory backup.json
+
+# Export OIDC configuration template
+./mock-todo-server export --oidc-config
+
+# Export OIDC config template to a custom file
+./mock-todo-server export --oidc-config my-oidc-config.json
 ```
 
 ## API Documentation
 
 ### Authentication Endpoints
+
+#### Standard Authentication (JWT/Session modes)
 
 | Method | Endpoint | Description |
 |--------|-------------|-------------|
@@ -79,6 +90,20 @@ Output a template for file storage:
 | POST | `/auth/logout` | User logout |
 | GET | `/auth/me` | Get current user info |
 | GET | `/auth/jwks` | Get JSON Web Key Set |
+
+#### OIDC Provider Endpoints (OIDC mode)
+
+| Method | Endpoint | Description |
+|--------|-------------|-------------|
+| GET/POST | `/auth/authorize` | Authorization endpoint (login form) |
+| POST | `/auth/token` | Token endpoint |
+| GET | `/auth/userinfo` | User info endpoint |
+| GET | `/auth/jwks` | Get JSON Web Key Set |
+
+#### Well-Known Endpoints
+
+| Method | Endpoint | Description |
+|--------|-------------|-------------|
 | GET | `/.well-known/jwks.json` | Standard JWKS endpoint |
 | GET | `/.well-known/openid_configuration` | OpenID Connect discovery |
 
@@ -148,6 +173,86 @@ curl -X DELETE http://localhost:8080/tasks/1 \
 
 3. **Both Mode** (`--auth-mode both`): Accepts either JWT or session authentication.
 
+4. **OIDC Mode** (`--auth-mode oidc`): Acts as an OpenID Connect provider.
+   - **Configuration Required**: OIDC mode requires a JSON configuration file
+   - Provides OAuth2/OIDC endpoints for testing client applications
+   - Uses JWT tokens for API access after OIDC authentication
+
+#### OIDC Configuration Setup
+
+OIDC mode requires a configuration file specified with `--oidc-config-path`. This file defines the OIDC provider settings.
+
+**Generate Configuration Template:**
+```bash
+# Generate OIDC configuration template
+./mock-todo-server export --oidc-config oidc-config.json
+```
+
+**Start Server with OIDC:**
+```bash
+# Start server in OIDC mode (configuration file is mandatory)
+./mock-todo-server serve --auth-mode oidc --oidc-config-path oidc-config.json
+```
+
+**Configuration File Structure:**
+
+The OIDC configuration file must contain the following required fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `client_id` | string | Yes | OAuth2 client identifier |
+| `client_secret` | string | Yes | OAuth2 client secret |
+| `redirect_uris` | array | Yes | Allowed redirect URIs for authorization code flow |
+| `issuer` | string | Yes | OIDC issuer identifier (typically server URL) |
+| `scopes` | array | Optional | Supported scopes (defaults to ["openid", "profile"]) |
+
+**Example Configuration:**
+```json
+{
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
+  "redirect_uris": [
+    "http://localhost:3000/callback",
+    "https://your-app.example.com/callback"
+  ],
+  "issuer": "http://localhost:8080",
+  "scopes": [
+    "openid",
+    "profile"
+  ]
+}
+```
+
+**Field Descriptions:**
+
+- **client_id**: Unique identifier for your OAuth2 client application
+- **client_secret**: Secret key for client authentication (keep this secure)
+- **redirect_uris**: Array of valid URLs where users can be redirected after authentication
+- **issuer**: The base URL of your OIDC provider (this server)
+- **scopes**: List of information scopes your application can request (openid is required for OIDC)
+
+**OIDC Flow Example:**
+
+1. **Authorization Request**: Direct users to `/auth/authorize` with appropriate parameters
+2. **User Login**: Users authenticate via the web form
+3. **Authorization Code**: Server redirects back with authorization code
+4. **Token Exchange**: Exchange code for access/ID tokens at `/auth/token`
+5. **API Access**: Use access token to call protected endpoints
+
+```bash
+# Example authorization URL
+http://localhost:8080/auth/authorize?client_id=your-client-id&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid%20profile
+
+# Exchange code for tokens
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=AUTH_CODE&redirect_uri=http://localhost:3000/callback&client_id=your-client-id&client_secret=your-client-secret"
+
+# Use access token for API calls
+curl -X GET http://localhost:8080/tasks \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
 ### Storage Options
 
 1. **Memory Storage** (default): Data is stored in memory and lost on server shutdown.
@@ -178,3 +283,4 @@ JSON format for file storage:
   ]
 }
 ```
+

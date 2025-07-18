@@ -50,6 +50,9 @@
 
 # RSA JWT署名でサーバーを起動
 ./mock-todo-server serve --jwt-key-mode rsa
+
+# OIDC認証でサーバーを起動
+./mock-todo-server serve --auth-mode oidc --oidc-config-path oidc-config.json
 ```
 
 #### データエクスポートコマンド
@@ -66,11 +69,19 @@
 
 # メモリ状態をカスタムファイルにエクスポート
 ./mock-todo-server export --memory backup.json
+
+# OIDC設定テンプレートをエクスポート
+./mock-todo-server export --oidc-config
+
+# OIDC設定テンプレートをカスタムファイルにエクスポート
+./mock-todo-server export --oidc-config my-oidc-config.json
 ```
 
 ## API ドキュメント
 
 ### 認証エンドポイント
+
+#### 標準認証（JWT/セッションモード）
 
 | メソッド | エンドポイント | 説明 |
 |--------|-------------|-----|
@@ -79,6 +90,20 @@
 | POST | `/auth/logout` | ユーザーログアウト |
 | GET | `/auth/me` | 現在のユーザー情報を取得 |
 | GET | `/auth/jwks` | JSON Web Key Setを取得 |
+
+#### OIDCプロバイダーエンドポイント（OIDCモード）
+
+| メソッド | エンドポイント | 説明 |
+|--------|-------------|-----|
+| GET/POST | `/auth/authorize` | 認可エンドポイント（ログインフォーム） |
+| POST | `/auth/token` | トークンエンドポイント |
+| GET | `/auth/userinfo` | ユーザー情報エンドポイント |
+| GET | `/auth/jwks` | JSON Web Key Setを取得 |
+
+#### Well-Knownエンドポイント
+
+| メソッド | エンドポイント | 説明 |
+|--------|-------------|-----|
 | GET | `/.well-known/jwks.json` | 標準JWKSエンドポイント |
 | GET | `/.well-known/openid_configuration` | OpenID Connect discovery |
 
@@ -148,6 +173,87 @@ curl -X DELETE http://localhost:8080/tasks/1 \
 
 3. **両方モード** (`--auth-mode both`): JWTまたはセッション認証のどちらでも受け入れ
 
+4. **OIDCモード** (`--auth-mode oidc`): OpenID Connectプロバイダーとして動作
+   - **設定ファイル必須**: OIDCモードにはJSON設定ファイルが必要
+   - クライアントアプリケーションのテスト用OAuth2/OIDCエンドポイントを提供
+   - OIDC認証後はJWTトークンを使用してAPI アクセス
+
+#### OIDC設定のセットアップ
+
+OIDCモードでは `--oidc-config-path` で指定する設定ファイルが必要
+このファイルでOIDCプロバイダーの設定を定義
+
+**設定テンプレートの生成:**
+```bash
+# OIDC設定テンプレートを生成
+./mock-todo-server export --oidc-config oidc-config.json
+```
+
+**OIDCモードでサーバー起動:**
+```bash
+# OIDCモードでサーバーを起動（設定ファイルは必須）
+./mock-todo-server serve --auth-mode oidc --oidc-config-path oidc-config.json
+```
+
+**設定ファイルの構造:**
+
+OIDC設定ファイルには以下の必須フィールドが含まれている必要があります：
+
+| フィールド | 型 | 必須 | 説明 |
+|-----------|----|----- |------|
+| `client_id` | string | はい | OAuth2クライアント識別子 |
+| `client_secret` | string | はい | OAuth2クライアントシークレット |
+| `redirect_uris` | array | はい | 認可コードフロー用の許可されたリダイレクトURI |
+| `issuer` | string | はい | OIDC発行者識別子（通常はサーバーURL） |
+| `scopes` | array | いいえ | サポートされるスコープ（デフォルト: ["openid", "profile"]） |
+
+**設定例:**
+```json
+{
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
+  "redirect_uris": [
+    "http://localhost:3000/callback",
+    "https://your-app.example.com/callback"
+  ],
+  "issuer": "http://localhost:8080",
+  "scopes": [
+    "openid",
+    "profile"
+  ]
+}
+```
+
+**フィールドの説明:**
+
+- **client_id**: OAuth2クライアントアプリケーションの一意識別子
+- **client_secret**: クライアント認証用の秘密キー（安全に保管してください）
+- **redirect_uris**: 認証後にユーザーをリダイレクトできる有効なURLの配列
+- **issuer**: OIDCプロバイダー（このサーバー）のベースURL
+- **scopes**: アプリケーションが要求できる情報スコープのリスト（OIDCにはopenidが必要）
+
+**OIDCフローの例:**
+
+1. **認可リクエスト**: 適切なパラメータで`/auth/authorize`にユーザーを誘導
+2. **ユーザーログイン**: ユーザーがWebフォームで認証
+3. **認可コード**: サーバーが認可コードでリダイレクト
+4. **トークン交換**: `/auth/token`で認可コードをアクセス/IDトークンと交換
+5. **API アクセス**: アクセストークンを使用して保護されたエンドポイントを呼び出し
+
+```bash
+# 認可URLの例
+http://localhost:8080/auth/authorize?client_id=your-client-id&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid%20profile
+
+# 認可コードをトークンと交換
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=AUTH_CODE&redirect_uri=http://localhost:3000/callback&client_id=your-client-id&client_secret=your-client-secret"
+
+# アクセストークンを使用してAPI 呼び出し
+curl -X GET http://localhost:8080/tasks \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+```
+
 ### ストレージオプション
 
 1. **メモリストレージ**（デフォルト）: データはメモリに保存され、サーバー停止時に失われます
@@ -178,3 +284,4 @@ curl -X DELETE http://localhost:8080/tasks/1 \
   ]
 }
 ```
+
