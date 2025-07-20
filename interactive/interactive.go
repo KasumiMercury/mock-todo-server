@@ -9,6 +9,8 @@ import (
 	"github.com/KasumiMercury/mock-todo-server/server/auth"
 	"github.com/charmbracelet/huh"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -281,8 +283,11 @@ func exportForm() []ExportConfig {
 func displayOneLiner(command string, flags []string, filePath string) {
 	fmt.Printf("\n--- Command line equivalent ---\n")
 
+	// Get the actual executable name from os.Args[0]
+	executableName := filepath.Base(os.Args[0])
+
 	var cmdParts []string
-	cmdParts = append(cmdParts, "./mock-todo-server", command)
+	cmdParts = append(cmdParts, executableName, command)
 	cmdParts = append(cmdParts, flags...)
 
 	if filePath != "" {
