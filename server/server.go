@@ -15,6 +15,7 @@ import (
 	"github.com/KasumiMercury/mock-todo-server/export"
 	"github.com/KasumiMercury/mock-todo-server/pid"
 	"github.com/KasumiMercury/mock-todo-server/server/auth"
+	"github.com/KasumiMercury/mock-todo-server/server/domain"
 	"github.com/KasumiMercury/mock-todo-server/server/store"
 	"github.com/gin-gonic/gin"
 )
@@ -103,9 +104,16 @@ func (s *Server) GetMemoryState() (*export.FileData, error) {
 	tasks := s.taskStore.GetAll()
 	users := s.userStore.GetAll()
 
+	// Convert users to UserStorage for export
+	userStorages := make([]*domain.UserStorage, 0, len(users))
+	for _, user := range users {
+		userStorage := user.ToStorage(user.HashedPassword)
+		userStorages = append(userStorages, userStorage)
+	}
+
 	return &export.FileData{
 		Tasks: tasks,
-		Users: users,
+		Users: userStorages,
 	}, nil
 }
 

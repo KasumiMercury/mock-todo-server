@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/KasumiMercury/mock-todo-server/pid"
 	"github.com/KasumiMercury/mock-todo-server/server/domain"
+	"golang.org/x/crypto/bcrypt"
 	"io"
 	"log"
 	"net/http"
@@ -48,8 +49,8 @@ func getServerPort() int {
 }
 
 type FileData struct {
-	Tasks []*domain.Task `json:"tasks"`
-	Users []*domain.User `json:"users"`
+	Tasks []*domain.Task        `json:"tasks"`
+	Users []*domain.UserStorage `json:"users"`
 }
 
 func Export(args []string, templateMode, memoryMode, oidcMode bool) error {
@@ -109,6 +110,17 @@ func GetOutputPath(args []string, defaultFilename string) string {
 func Template(filePath string) error {
 	now := time.Now()
 
+	// Create hashed passwords for template users
+	hashedPassword1, err := bcrypt.GenerateFromPassword([]byte("password1"), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password for user1: %w", err)
+	}
+
+	hashedPassword2, err := bcrypt.GenerateFromPassword([]byte("password2"), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password for user2: %w", err)
+	}
+
 	sampleData := FileData{
 		Tasks: []*domain.Task{
 			{
@@ -124,16 +136,18 @@ func Template(filePath string) error {
 				CreatedAt: now.Add(time.Minute).Format(time.RFC3339),
 			},
 		},
-		Users: []*domain.User{
+		Users: []*domain.UserStorage{
 			{
-				ID:        1,
-				Username:  "user1",
-				CreatedAt: now,
+				ID:             1,
+				Username:       "user1",
+				HashedPassword: string(hashedPassword1),
+				CreatedAt:      now,
 			},
 			{
-				ID:        2,
-				Username:  "user2",
-				CreatedAt: now.Add(time.Minute),
+				ID:             2,
+				Username:       "user2",
+				HashedPassword: string(hashedPassword2),
+				CreatedAt:      now.Add(time.Minute),
 			},
 		},
 	}
@@ -152,6 +166,9 @@ func Template(filePath string) error {
 	}
 
 	log.Println("Template file created at:", filePath)
+	log.Println("Template includes 2 users:")
+	log.Println("  - user1 (password: password1)")
+	log.Println("  - user2 (password: password2)")
 
 	return nil
 }
@@ -219,7 +236,7 @@ func getMemoryStateDirectly() (*FileData, error) {
 	// or use other mechanisms to preserve state
 	return &FileData{
 		Tasks: []*domain.Task{},
-		Users: []*domain.User{},
+		Users: []*domain.UserStorage{},
 	}, nil
 }
 

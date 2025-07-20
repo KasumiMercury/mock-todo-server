@@ -39,6 +39,10 @@ Output a template for file storage:
 ./mock-todo-server export --template
 ```
 
+The template includes 2 sample users with hashed passwords:
+- **user1** (password: `password1`)
+- **user2** (password: `password2`)
+
 ### Data Persistence
 
 By default, data is stored in memory and lost when the server stops.
@@ -76,6 +80,10 @@ To persist data, use file storage:
 
 # Export the template to a custom file
 ./mock-todo-server export --template custom.json
+
+# Template includes sample users:
+# - user1 (password: password1)
+# - user2 (password: password2)
 
 # Export the current server memory state
 ./mock-todo-server export --memory
@@ -314,11 +322,16 @@ JSON format for file storage:
     {
       "id": 1,
       "username": "user1",
+      "hashed_password": "$2a$10$...",
       "created_at": "2023-01-01T00:00:00Z"
     }
   ]
 }
 ```
+
+**Note**: When using the template export (`--template`), sample users are included with pre-hashed passwords:
+- **user1** with password: `password1`
+- **user2** with password: `password2`
 
 ## Use Cases
 
