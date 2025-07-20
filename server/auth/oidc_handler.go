@@ -129,6 +129,58 @@ func (h *OIDCHandler) showLoginForm(c *gin.Context, clientID, redirectURI, scope
 	})
 }
 
+// showRegisterForm displays the registration form
+func (h *OIDCHandler) showRegisterForm(c *gin.Context) {
+	h.showRegisterFormWithData(c, "", "", "")
+}
+
+// showRegisterFormWithData displays the registration form with additional data
+func (h *OIDCHandler) showRegisterFormWithData(c *gin.Context, username, errorMsg, successMsg string) {
+	c.HTML(http.StatusOK, "register.html", gin.H{
+		"Username": username,
+		"Error":    errorMsg,
+		"Success":  successMsg,
+	})
+}
+
+// Register handles both GET (show form) and POST (process registration) for OIDC registration
+func (h *OIDCHandler) Register(c *gin.Context) {
+	if c.Request.Method == "GET" {
+		h.handleRegisterGET(c)
+		return
+	}
+
+	h.handleRegisterPOST(c)
+}
+
+// handleRegisterGET shows the registration form (no OIDC context required)
+func (h *OIDCHandler) handleRegisterGET(c *gin.Context) {
+	h.showRegisterForm(c)
+}
+
+// handleRegisterPOST processes the registration form submission
+func (h *OIDCHandler) handleRegisterPOST(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	// Validate form data
+	if username == "" || password == "" {
+		h.showRegisterFormWithData(c, username, "Username and password are required", "")
+		return
+	}
+
+	// Register user
+	_, _, err := h.authService.Register(username, password)
+	if err != nil {
+		h.showRegisterFormWithData(c, username, err.Error(), "")
+		return
+	}
+
+	// Show success message and provide login link
+	successMsg := "Registration successful! You can now login with your credentials."
+	h.showRegisterFormWithData(c, "", "", successMsg)
+}
+
 // Token handles the token endpoint
 func (h *OIDCHandler) Token(c *gin.Context) {
 	grantType := c.PostForm("grant_type")
