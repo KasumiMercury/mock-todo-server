@@ -32,10 +32,14 @@ Go言語ベースのモックTODOサーバー。タスク管理のためのREST 
 ./mock-todo-server export --memory backup.json
 ```
 
-ファイルストレージ用のテンプレート出力
+ファイルストレージ用のテンプレート出力：
 ```bash
 ./mock-todo-server export --template
 ```
+
+テンプレートは2つのサンプルユーザーをハッシュ化されたパスワードとともに含む：
+- **user1** （パスワード: `password1`）
+- **user2** （パスワード: `password2`）
 
 ### データ永続化
 
@@ -74,6 +78,10 @@ Go言語ベースのモックTODOサーバー。タスク管理のためのREST 
 
 # テンプレートをカスタムファイルにエクスポート
 ./mock-todo-server export --template custom.json
+
+# テンプレートはサンプルユーザーを含む：
+# - user1 （パスワード: password1）
+# - user2 （パスワード: password2）
 
 # 現在のサーバーメモリ状態をエクスポート
 ./mock-todo-server export --memory
@@ -312,11 +320,16 @@ curl -X GET http://localhost:8080/tasks \
     {
       "id": 1,
       "username": "user1",
+      "hashed_password": "$2a$10$...",
       "created_at": "2023-01-01T00:00:00Z"
     }
   ]
 }
 ```
+
+**注意**: テンプレートエクスポート（`--template`）を使用する場合、サンプルユーザーがハッシュ化済みパスワードとともに含まれている：
+- **user1** パスワード: `password1`
+- **user2** パスワード: `password2`
 
 ## ユースケース
 
