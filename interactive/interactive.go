@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	exportHandler "github.com/KasumiMercury/mock-todo-server/export"
+	"github.com/KasumiMercury/mock-todo-server/flagmanager"
 	"github.com/KasumiMercury/mock-todo-server/server"
 	"github.com/KasumiMercury/mock-todo-server/server/auth"
 	"github.com/charmbracelet/huh"
 	"log"
 	"strconv"
+	"strings"
 )
 
 func Start() {
@@ -18,9 +20,15 @@ func Start() {
 		switch selectedCommand {
 		case serve:
 			config := serveForm()
+
 			if err := server.Run(config); err != nil {
 				log.Fatal("Failed to start server:", err)
 			}
+
+			flagConfig := flagmanager.NewServeFlagConfig()
+			flagConfig.FromServerConfig(config)
+			flags := flagConfig.ReconstructFlags()
+			displayOneLiner("serve", flags, "")
 		case stop:
 			err := server.Stop()
 			if err != nil {
@@ -33,6 +41,13 @@ func Start() {
 				if err := exportHandler.ExportWithMode(config.Mode, config.FilePath); err != nil {
 					log.Printf("Failed to export %s: %v", config.Mode, err)
 				}
+			}
+
+			for _, config := range exportConfigs {
+				flagConfig := flagmanager.NewExportFlagConfig()
+				flagConfig.FromExportMode(config.Mode)
+				flags := flagConfig.ReconstructFlags()
+				displayOneLiner("export", flags, config.FilePath)
 			}
 		case exit:
 			return
@@ -260,4 +275,19 @@ func exportForm() []ExportConfig {
 	}
 
 	return configs
+}
+
+// displayOneLiner prints the command-line equivalent of the configuration
+func displayOneLiner(command string, flags []string, filePath string) {
+	fmt.Printf("\n--- Command line equivalent ---\n")
+
+	var cmdParts []string
+	cmdParts = append(cmdParts, "./mock-todo-server", command)
+	cmdParts = append(cmdParts, flags...)
+
+	if filePath != "" {
+		cmdParts = append(cmdParts, filePath)
+	}
+
+	fmt.Printf("%s\n\n", strings.Join(cmdParts, " "))
 }
