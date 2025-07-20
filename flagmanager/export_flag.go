@@ -45,7 +45,7 @@ var exportFlagDefinitions = []ExportFlagDef{
 	{
 		FlagType:    FlagTypeBool,
 		Name:        "oidc-config",
-		ShortName:   "",
+		ShortName:   "o",
 		Description: "Export OIDC configuration template",
 		DefaultVal:  false,
 		BindFunc:    func(c *ExportFlagConfig) interface{} { return &c.OidcMode },
