@@ -112,6 +112,7 @@ To persist data, use file storage:
 | POST | `/auth/token` | Token endpoint |
 | GET | `/auth/userinfo` | User info endpoint |
 | GET | `/auth/jwks` | Get JSON Web Key Set |
+| GET/POST | `/auth/register` | User registration (web form) |
 
 #### Well-Known Endpoints
 
@@ -244,13 +245,35 @@ The OIDC configuration file must contain the following required fields:
 - **issuer**: The base URL of your OIDC provider (this server)
 - **scopes**: List of information scopes your application can request (openid is required for OIDC)
 
+**User Registration in OIDC Mode:**
+
+OIDC mode includes a web-based user registration system that operates independently of the OIDC authentication flow:
+
+- **Registration URL**: Access `/auth/register` directly (no OIDC parameters required)
+- **Independent from OIDC Flow**: Registration is a server-side feature, not part of the OAuth2/OIDC specification
+- **Web Interface**: Provides an HTML form for username/password registration
+- **Development Focus**: Designed to simplify user creation during frontend development and testing
+
+```bash
+# Access registration page directly
+http://localhost:8080/auth/register
+
+# Or programmatically register users (in OIDC mode)
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=testuser&password=testpass"
+```
+
+After registration, users can authenticate through the standard OIDC authorization flow.
+
 **OIDC Flow Example:**
 
-1. **Authorization Request**: Direct users to `/auth/authorize` with appropriate parameters
-2. **User Login**: Users authenticate via the web form
-3. **Authorization Code**: Server redirects back with authorization code
-4. **Token Exchange**: Exchange code for access/ID tokens at `/auth/token`
-5. **API Access**: Use access token to call protected endpoints
+1. **User Registration** (optional): Create test users via `/auth/register`
+2. **Authorization Request**: Direct users to `/auth/authorize` with appropriate parameters
+3. **User Login**: Users authenticate via the web form
+4. **Authorization Code**: Server redirects back with authorization code
+5. **Token Exchange**: Exchange code for access/ID tokens at `/auth/token`
+6. **API Access**: Use access token to call protected endpoints
 
 ```bash
 # Example authorization URL
