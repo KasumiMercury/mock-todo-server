@@ -126,6 +126,16 @@ func serveForm() *server.Config {
 
 	config.AuthRequired = !disabledAuth
 
+	jsonFilePathInput := huh.NewInput().
+		Title("JSON File Path").
+		Description("Enter the path to the JSON file as a data storage source. (leave empty for using memory state)").
+		Prompt("Enter JSON file path:").
+		Placeholder("data.json").
+		Value(&config.JsonFilePath)
+	if err := jsonFilePathInput.Run(); err != nil {
+		log.Fatal("Failed to get JSON file path input:", err)
+	}
+
 	jwtModeSelector := huh.NewSelect[auth.JWTKeyMode]().
 		Title("Select JWT Key Mode").
 		Options(
