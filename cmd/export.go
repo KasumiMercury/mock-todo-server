@@ -5,15 +5,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/KasumiMercury/mock-todo-server/export"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/KasumiMercury/mock-todo-server/export"
+	"github.com/KasumiMercury/mock-todo-server/flagmanager"
+	"github.com/spf13/cobra"
 )
 
 var (
-	templateMode bool
-	memoryMode   bool
-	oidcMode     bool
+	exportFlagConfig *flagmanager.ExportFlagConfig
 )
 
 // exportCmd represents the export command
@@ -42,30 +42,23 @@ Examples:
   mock-todo-server export --memory backup.json`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Count active flags
-		activeFlags := 0
-		if templateMode {
-			activeFlags++
-		}
-		if memoryMode {
-			activeFlags++
-		}
-		if oidcMode {
-			activeFlags++
-		}
-
-		if activeFlags == 0 {
-			fmt.Println("Error: Must specify one of --template, --memory, or --oidc-config flag")
+		// Validate export flags
+		if err := exportFlagConfig.Validate(); err != nil {
+			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		if activeFlags > 1 {
-			fmt.Println("Error: Cannot specify multiple export flags simultaneously")
+		// Get export parameters
+		mode, filePath, err := exportFlagConfig.ToExportParams(args)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		if err := export.Export(args, templateMode, memoryMode, oidcMode); err != nil {
+		// Execute export
+		if err := export.ExportWithMode(mode, filePath); err != nil {
 			fmt.Printf("Error exporting data: %v\n", err)
+			os.Exit(1)
 		}
 	},
 }
@@ -73,7 +66,9 @@ Examples:
 func init() {
 	rootCmd.AddCommand(exportCmd)
 
-	exportCmd.Flags().BoolVarP(&templateMode, "template", "t", false, "Export JSON data template file")
-	exportCmd.Flags().BoolVarP(&memoryMode, "memory", "m", false, "Export current memory store state")
-	exportCmd.Flags().BoolVar(&oidcMode, "oidc-config", false, "Export OIDC configuration template")
+	// Initialize export flag config
+	exportFlagConfig = flagmanager.NewExportFlagConfig()
+
+	// Register flags
+	exportFlagConfig.RegisterFlags(exportCmd)
 }
