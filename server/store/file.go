@@ -10,8 +10,8 @@ import (
 )
 
 type FileData struct {
-	Tasks []*domain.Task `json:"tasks"`
-	Users []*domain.User `json:"users"`
+	Tasks []*domain.Task        `json:"tasks"`
+	Users []*domain.UserStorage `json:"users"`
 }
 
 type TaskFileStore struct {
@@ -99,7 +99,7 @@ func (ts *TaskFileStore) loadDataFromFile() *FileData {
 	if _, err := os.Stat(ts.filePath); os.IsNotExist(err) {
 		if err := ts.createEmptyFile(); err != nil {
 			log.Println("Error creating empty data file:", err)
-			return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+			return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 		}
 	}
 
@@ -107,18 +107,18 @@ func (ts *TaskFileStore) loadDataFromFile() *FileData {
 	file, err := os.ReadFile(ts.filePath)
 	if err != nil {
 		log.Println("Error reading data file:", err)
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	// Handle empty file
 	if len(file) == 0 {
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	var data FileData
 	if err := json.Unmarshal(file, &data); err != nil {
 		log.Println("Error unmarshalling data:", err)
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	// Initialize empty arrays if nil
@@ -126,7 +126,7 @@ func (ts *TaskFileStore) loadDataFromFile() *FileData {
 		data.Tasks = []*domain.Task{}
 	}
 	if data.Users == nil {
-		data.Users = []*domain.User{}
+		data.Users = []*domain.UserStorage{}
 	}
 
 	return &data
@@ -137,7 +137,7 @@ func (us *UserFileStore) loadDataFromFile() *FileData {
 	if _, err := os.Stat(us.filePath); os.IsNotExist(err) {
 		if err := us.createEmptyFile(); err != nil {
 			log.Println("Error creating empty data file:", err)
-			return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+			return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 		}
 	}
 
@@ -145,18 +145,18 @@ func (us *UserFileStore) loadDataFromFile() *FileData {
 	file, err := os.ReadFile(us.filePath)
 	if err != nil {
 		log.Println("Error reading data file:", err)
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	// Handle empty file
 	if len(file) == 0 {
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	var data FileData
 	if err := json.Unmarshal(file, &data); err != nil {
 		log.Println("Error unmarshalling data:", err)
-		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.User{}}
+		return &FileData{Tasks: []*domain.Task{}, Users: []*domain.UserStorage{}}
 	}
 
 	// Initialize empty arrays if nil
@@ -164,7 +164,7 @@ func (us *UserFileStore) loadDataFromFile() *FileData {
 		data.Tasks = []*domain.Task{}
 	}
 	if data.Users == nil {
-		data.Users = []*domain.User{}
+		data.Users = []*domain.UserStorage{}
 	}
 
 	return &data
@@ -173,7 +173,7 @@ func (us *UserFileStore) loadDataFromFile() *FileData {
 func (ts *TaskFileStore) createEmptyFile() error {
 	emptyData := FileData{
 		Tasks: []*domain.Task{},
-		Users: []*domain.User{},
+		Users: []*domain.UserStorage{},
 	}
 	data, err := json.Marshal(emptyData)
 	if err != nil {
@@ -185,7 +185,7 @@ func (ts *TaskFileStore) createEmptyFile() error {
 func (us *UserFileStore) createEmptyFile() error {
 	emptyData := FileData{
 		Tasks: []*domain.Task{},
-		Users: []*domain.User{},
+		Users: []*domain.UserStorage{},
 	}
 	data, err := json.Marshal(emptyData)
 	if err != nil {
@@ -294,7 +294,11 @@ func (us *UserFileStore) GetAll() []*domain.User {
 	defer us.mu.RUnlock()
 
 	data := us.loadDataFromFile()
-	return data.Users
+	users := make([]*domain.User, 0, len(data.Users))
+	for _, userStorage := range data.Users {
+		users = append(users, userStorage.ToUser())
+	}
+	return users
 }
 
 func (us *UserFileStore) GetByID(id int) (*domain.User, bool) {
@@ -302,9 +306,9 @@ func (us *UserFileStore) GetByID(id int) (*domain.User, bool) {
 	defer us.mu.RUnlock()
 
 	data := us.loadDataFromFile()
-	for _, user := range data.Users {
-		if user.ID == id {
-			return user, true
+	for _, userStorage := range data.Users {
+		if userStorage.ID == id {
+			return userStorage.ToUser(), true
 		}
 	}
 	return nil, false
@@ -315,9 +319,9 @@ func (us *UserFileStore) GetByUsername(username string) (*domain.User, bool) {
 	defer us.mu.RUnlock()
 
 	data := us.loadDataFromFile()
-	for _, user := range data.Users {
-		if user.Username == username {
-			return user, true
+	for _, userStorage := range data.Users {
+		if userStorage.Username == username {
+			return userStorage.ToUser(), true
 		}
 	}
 	return nil, false
@@ -332,7 +336,9 @@ func (us *UserFileStore) Create(user *domain.User) *domain.User {
 	user.CreatedAt = time.Now()
 
 	data := us.loadDataFromFile()
-	data.Users = append(data.Users, user)
+	// Convert User to UserStorage for JSON persistence
+	userStorage := user.ToStorage(user.HashedPassword)
+	data.Users = append(data.Users, userStorage)
 
 	// Marshal data to json and write to file
 	jsonData, err := json.Marshal(data)
@@ -354,11 +360,13 @@ func (us *UserFileStore) Update(id int, updatedUser *domain.User) (*domain.User,
 	defer us.mu.Unlock()
 
 	data := us.loadDataFromFile()
-	for i, user := range data.Users {
-		if user.ID == id {
+	for i, userStorage := range data.Users {
+		if userStorage.ID == id {
 			updatedUser.ID = id
-			updatedUser.CreatedAt = user.CreatedAt // Preserve the original creation time
-			data.Users[i] = updatedUser
+			updatedUser.CreatedAt = userStorage.CreatedAt // Preserve the original creation time
+			// Convert User to UserStorage for JSON persistence
+			newUserStorage := updatedUser.ToStorage(updatedUser.HashedPassword)
+			data.Users[i] = newUserStorage
 
 			// Marshal data to json and write to file
 			jsonData, err := json.Marshal(data)
@@ -383,8 +391,8 @@ func (us *UserFileStore) Delete(id int) bool {
 	defer us.mu.Unlock()
 
 	data := us.loadDataFromFile()
-	for i, user := range data.Users {
-		if user.ID == id {
+	for i, userStorage := range data.Users {
+		if userStorage.ID == id {
 			data.Users = append(data.Users[:i], data.Users[i+1:]...) // Remove the user
 			// Marshal data to json and write to file
 			jsonData, err := json.Marshal(data)
