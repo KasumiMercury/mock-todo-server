@@ -130,6 +130,7 @@ func (s *Server) setupRoutes() {
 			authGroup.POST("/token", s.oidcHandler.Token)
 			authGroup.GET("/userinfo", s.oidcHandler.UserInfo)
 			authGroup.GET("/jwks", s.authHandler.GetJWKs)
+			authGroup.POST("/register", s.authHandler.Register)
 		} else {
 			// Standard auth routes
 			authGroup.POST("/login", s.authHandler.Login)
