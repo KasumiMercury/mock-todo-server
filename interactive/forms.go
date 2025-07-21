@@ -92,62 +92,10 @@ func createJSONFilePathInput() string {
 		Prompt("Enter JSON file path:").
 		Placeholder("data.json").
 		Value(&jsonFilePath).
-		SuggestionsFunc(func() []string {
-			var suggestions []string
-			seen := make(map[string]bool)
-
-			currentFiles, err := filepath.Glob("*.json")
-			if err == nil {
-				for _, file := range currentFiles {
-					if !seen[file] {
-						suggestions = append(suggestions, file)
-						seen[file] = true
-					}
-				}
-			}
-
-			if jsonFilePath == "" {
-				return suggestions
-			}
-
-			var searchDirs []string
-
-			if strings.HasSuffix(jsonFilePath, string(filepath.Separator)) || strings.HasSuffix(jsonFilePath, "/") {
-				searchDirs = append(searchDirs, jsonFilePath)
-			} else {
-				dir := filepath.Dir(jsonFilePath)
-				if dir != "." && dir != jsonFilePath {
-					searchDirs = append(searchDirs, dir)
-				}
-			}
-
-			for _, searchDir := range searchDirs {
-				if _, err := os.Stat(searchDir); os.IsNotExist(err) {
-					continue
-				}
-
-				pattern := filepath.Join(searchDir, "*.json")
-				files, err := filepath.Glob(pattern)
-				if err != nil {
-					continue
-				}
-
-				for _, file := range files {
-					// 相対パス形式で正規化
-					relPath, err := filepath.Rel(".", file)
-					if err != nil {
-						relPath = file
-					}
-
-					if !seen[relPath] {
-						suggestions = append(suggestions, relPath)
-						seen[relPath] = true
-					}
-				}
-			}
-
-			return suggestions
-		}, &jsonFilePath)
+		SuggestionsFunc(
+			jsonFileSuggestionsFunc(jsonFilePath),
+			&jsonFilePath,
+		)
 
 	if err := jsonFilePathInput.Run(); err != nil {
 		log.Fatal("Failed to get JSON file path input:", err)
@@ -291,5 +239,63 @@ func exportForm() ExportConfig {
 	return ExportConfig{
 		Mode:     selectedMode,
 		FilePath: filePath,
+	}
+}
+
+func jsonFileSuggestionsFunc(inputStr string) func() []string {
+	return func() []string {
+		var suggestions []string
+		seen := make(map[string]bool)
+
+		currentFiles, err := filepath.Glob("*.json")
+		if err == nil {
+			for _, file := range currentFiles {
+				if !seen[file] {
+					suggestions = append(suggestions, file)
+					seen[file] = true
+				}
+			}
+		}
+
+		if inputStr == "" {
+			return suggestions
+		}
+
+		var searchDirs []string
+
+		if strings.HasSuffix(inputStr, string(filepath.Separator)) || strings.HasSuffix(inputStr, "/") {
+			searchDirs = append(searchDirs, inputStr)
+		} else {
+			dir := filepath.Dir(inputStr)
+			if dir != "." && dir != inputStr {
+				searchDirs = append(searchDirs, dir)
+			}
+		}
+
+		for _, searchDir := range searchDirs {
+			if _, err := os.Stat(searchDir); os.IsNotExist(err) {
+				continue
+			}
+
+			pattern := filepath.Join(searchDir, "*.json")
+			files, err := filepath.Glob(pattern)
+			if err != nil {
+				continue
+			}
+
+			for _, file := range files {
+				relPath, err := filepath.Rel(".", file)
+				if err != nil {
+					relPath = file
+				}
+
+				if !seen[relPath] {
+					suggestions = append(suggestions, relPath)
+					seen[relPath] = true
+				}
+			}
+		}
+
+		return suggestions
 	}
 }
