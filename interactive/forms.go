@@ -3,7 +3,10 @@ package interactive
 import (
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	exportHandler "github.com/KasumiMercury/mock-todo-server/export"
 	"github.com/KasumiMercury/mock-todo-server/server"
@@ -88,7 +91,63 @@ func createJSONFilePathInput() string {
 		Description("Enter the path to the JSON file as a data storage source. (leave empty for using memory state)").
 		Prompt("Enter JSON file path:").
 		Placeholder("data.json").
-		Value(&jsonFilePath)
+		Value(&jsonFilePath).
+		SuggestionsFunc(func() []string {
+			var suggestions []string
+			seen := make(map[string]bool)
+
+			currentFiles, err := filepath.Glob("*.json")
+			if err == nil {
+				for _, file := range currentFiles {
+					if !seen[file] {
+						suggestions = append(suggestions, file)
+						seen[file] = true
+					}
+				}
+			}
+
+			if jsonFilePath == "" {
+				return suggestions
+			}
+
+			var searchDirs []string
+
+			if strings.HasSuffix(jsonFilePath, string(filepath.Separator)) || strings.HasSuffix(jsonFilePath, "/") {
+				searchDirs = append(searchDirs, jsonFilePath)
+			} else {
+				dir := filepath.Dir(jsonFilePath)
+				if dir != "." && dir != jsonFilePath {
+					searchDirs = append(searchDirs, dir)
+				}
+			}
+
+			for _, searchDir := range searchDirs {
+				if _, err := os.Stat(searchDir); os.IsNotExist(err) {
+					continue
+				}
+
+				pattern := filepath.Join(searchDir, "*.json")
+				files, err := filepath.Glob(pattern)
+				if err != nil {
+					continue
+				}
+
+				for _, file := range files {
+					// 相対パス形式で正規化
+					relPath, err := filepath.Rel(".", file)
+					if err != nil {
+						relPath = file
+					}
+
+					if !seen[relPath] {
+						suggestions = append(suggestions, relPath)
+						seen[relPath] = true
+					}
+				}
+			}
+
+			return suggestions
+		}, &jsonFilePath)
 
 	if err := jsonFilePathInput.Run(); err != nil {
 		log.Fatal("Failed to get JSON file path input:", err)
