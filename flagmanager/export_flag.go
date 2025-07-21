@@ -157,7 +157,7 @@ func (c *ExportFlagConfig) GetActiveMode() (export.ExportMode, error) {
 	}
 
 	if c.TemplateMode {
-		return export.TemplateMode, nil
+		return export.StoreMode, nil
 	}
 	if c.MemoryMode {
 		return export.MemoryExportMode, nil
@@ -185,8 +185,8 @@ func (c *ExportFlagConfig) ToExportParams(args []string) (mode export.ExportMode
 // getDefaultFilename returns the default filename for the given export mode
 func getDefaultFilename(mode export.ExportMode) string {
 	switch mode {
-	case export.TemplateMode:
-		return export.DefaultTemplateFile
+	case export.StoreMode:
+		return export.DefaultStoreFile
 	case export.MemoryExportMode:
 		return export.DefaultMemoryFile
 	case export.OidcMode:
@@ -205,7 +205,7 @@ func (c *ExportFlagConfig) FromExportMode(mode export.ExportMode) {
 
 	// Set the appropriate flag based on the mode
 	switch mode {
-	case export.TemplateMode:
+	case export.StoreMode:
 		c.TemplateMode = true
 	case export.MemoryExportMode:
 		c.MemoryMode = true

@@ -17,15 +17,15 @@ import (
 type ExportMode string
 
 const (
-	TemplateMode     ExportMode = "template"
+	StoreMode        ExportMode = "store"
 	MemoryExportMode ExportMode = "memory"
 	OidcMode         ExportMode = "oidc"
 )
 
 const (
-	DefaultTemplateFile = "data.json"
-	DefaultMemoryFile   = "memory-state.json"
-	DefaultOidcFile     = "oidc-config.json"
+	DefaultStoreFile  = "data.json"
+	DefaultMemoryFile = "memory-state.json"
+	DefaultOidcFile   = "oidc-config.json"
 )
 
 type ServerProvider interface {
@@ -53,31 +53,12 @@ type FileData struct {
 	Users []*domain.UserStorage `json:"users"`
 }
 
-func Export(args []string, templateMode, memoryMode, oidcMode bool) error {
-	if templateMode {
-		filePath := GetOutputPath(args, DefaultTemplateFile)
-		return Template(filePath)
-	}
-
-	if memoryMode {
-		filePath := GetOutputPath(args, DefaultMemoryFile)
-		return MemoryState(filePath)
-	}
-
-	if oidcMode {
-		filePath := GetOutputPath(args, DefaultOidcFile)
-		return OidcTemplate(filePath)
-	}
-
-	return fmt.Errorf("no valid export mode specified")
-}
-
 // ExportWithMode exports data based on the specified mode and file path.
 func ExportWithMode(mode ExportMode, filePath string) error {
 	if filePath == "" {
 		switch mode {
-		case TemplateMode:
-			filePath = DefaultTemplateFile
+		case StoreMode:
+			filePath = DefaultStoreFile
 		case MemoryExportMode:
 			filePath = DefaultMemoryFile
 		case OidcMode:
@@ -88,8 +69,8 @@ func ExportWithMode(mode ExportMode, filePath string) error {
 	}
 
 	switch mode {
-	case TemplateMode:
-		return Template(filePath)
+	case StoreMode:
+		return Store(filePath)
 	case MemoryExportMode:
 		return MemoryState(filePath)
 	case OidcMode:
@@ -107,7 +88,7 @@ func GetOutputPath(args []string, defaultFilename string) string {
 	return defaultFilename
 }
 
-func Template(filePath string) error {
+func Store(filePath string) error {
 	now := time.Now()
 
 	// Create hashed passwords for template users

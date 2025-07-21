@@ -44,6 +44,7 @@ func TestExportRegisterFlags(t *testing.T) {
 	expectedShortFlags := map[string]string{
 		"t": "template",
 		"m": "memory",
+		"o": "oidc-config",
 	}
 
 	for shortFlag, longFlag := range expectedShortFlags {
@@ -52,11 +53,6 @@ func TestExportRegisterFlags(t *testing.T) {
 		} else if flag.Name != longFlag {
 			t.Errorf("Short flag -%s points to %s, expected %s", shortFlag, flag.Name, longFlag)
 		}
-	}
-
-	// Check that oidc-config has no short flag
-	if flag := cmd.Flags().ShorthandLookup("o"); flag != nil {
-		t.Error("oidc-config should not have a short flag")
 	}
 }
 
@@ -135,7 +131,7 @@ func TestGetActiveMode(t *testing.T) {
 		{
 			name:         "template mode",
 			config:       ExportFlagConfig{TemplateMode: true},
-			expectedMode: export.TemplateMode,
+			expectedMode: export.StoreMode,
 			expectError:  false,
 		},
 		{
@@ -189,15 +185,15 @@ func TestToExportParams(t *testing.T) {
 			name:             "template mode with no args",
 			config:           ExportFlagConfig{TemplateMode: true},
 			args:             []string{},
-			expectedMode:     export.TemplateMode,
-			expectedFilePath: export.DefaultTemplateFile,
+			expectedMode:     export.StoreMode,
+			expectedFilePath: export.DefaultStoreFile,
 			expectError:      false,
 		},
 		{
 			name:             "template mode with custom file",
 			config:           ExportFlagConfig{TemplateMode: true},
 			args:             []string{"custom-template.json"},
-			expectedMode:     export.TemplateMode,
+			expectedMode:     export.StoreMode,
 			expectedFilePath: "custom-template.json",
 			expectError:      false,
 		},
@@ -277,7 +273,7 @@ func TestExportReconstructFlags(t *testing.T) {
 		{
 			name:          "oidc mode",
 			config:        ExportFlagConfig{OidcMode: true},
-			expectedFlags: []string{"--oidc-config"}, // no short flag available
+			expectedFlags: []string{"-o"},
 		},
 	}
 
@@ -353,8 +349,8 @@ func TestExportReconstructFlagsShortVsLong(t *testing.T) {
 
 	// Verify short and long flags are used appropriately
 	expectedFlags := map[string]bool{
-		"-t":            false,
-		"--oidc-config": false,
+		"-t": false,
+		"-o": false,
 	}
 
 	for _, flag := range flags {

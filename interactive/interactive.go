@@ -30,7 +30,7 @@ func Start() {
 			flagConfig := flagmanager.NewServeFlagConfig()
 			flagConfig.FromServerConfig(config)
 			flags := flagConfig.ReconstructFlags()
-			displayOneLiner("serve", flags, "")
+			displayOneLiner([]string{"serve"}, flags)
 		case stop:
 			err := server.Stop()
 			if err != nil {
@@ -43,10 +43,12 @@ func Start() {
 				log.Printf("Failed to export %s: %v", exportConfig.Mode, err)
 			}
 
-			flagConfig := flagmanager.NewExportFlagConfig()
-			flagConfig.FromExportMode(exportConfig.Mode)
-			flags := flagConfig.ReconstructFlags()
-			displayOneLiner("export", flags, exportConfig.FilePath)
+			commands := []string{"export", string(exportConfig.Mode)}
+			if exportConfig.FilePath != "" {
+				commands = append(commands, exportConfig.FilePath)
+			}
+
+			displayOneLiner(commands, nil)
 		case exit:
 			return
 		default:
@@ -214,7 +216,7 @@ func exportForm() ExportConfig {
 	modeSelector := huh.NewSelect[exportHandler.ExportMode]().
 		Title("Select export modes").
 		Options(
-			huh.NewOption("JSON Data Template", exportHandler.TemplateMode),
+			huh.NewOption("JSON Data Template", exportHandler.StoreMode),
 			huh.NewOption("Memory State", exportHandler.MemoryExportMode),
 			huh.NewOption("OIDC Configuration Template", exportHandler.OidcMode),
 		).
@@ -228,7 +230,7 @@ func exportForm() ExportConfig {
 		TitleFunc(
 			func() string {
 				switch selectedMode {
-				case exportHandler.TemplateMode:
+				case exportHandler.StoreMode:
 					return "JSON Data Template File Path"
 				case exportHandler.MemoryExportMode:
 					return "Memory State File Path"
@@ -243,8 +245,8 @@ func exportForm() ExportConfig {
 		Prompt("Enter file path:").
 		PlaceholderFunc(func() string {
 			switch selectedMode {
-			case exportHandler.TemplateMode:
-				return exportHandler.DefaultTemplateFile
+			case exportHandler.StoreMode:
+				return exportHandler.DefaultStoreFile
 			case exportHandler.MemoryExportMode:
 				return exportHandler.DefaultMemoryFile
 			case exportHandler.OidcMode:
@@ -266,19 +268,16 @@ func exportForm() ExportConfig {
 }
 
 // displayOneLiner prints the command-line equivalent of the configuration
-func displayOneLiner(command string, flags []string, filePath string) {
+func displayOneLiner(commands []string, flags []string) {
 	fmt.Printf("\n--- Command line equivalent ---\n")
 
 	// Get the actual executable name from os.Args[0]
 	executableName := filepath.Base(os.Args[0])
 
 	var cmdParts []string
-	cmdParts = append(cmdParts, executableName, command)
+	cmdParts = append(cmdParts, executableName)
+	cmdParts = append(cmdParts, commands...)
 	cmdParts = append(cmdParts, flags...)
-
-	if filePath != "" {
-		cmdParts = append(cmdParts, filePath)
-	}
 
 	fmt.Printf("%s\n\n", strings.Join(cmdParts, " "))
 }
