@@ -175,7 +175,11 @@ func createOIDCConfigInput() string {
 				return nil
 			},
 		).
-		Value(&oidcConfigPath)
+		Value(&oidcConfigPath).
+		SuggestionsFunc(
+			jsonFileSuggestionsFunc(oidcConfigPath),
+			&oidcConfigPath,
+		)
 
 	if err := oidcConfigPathInput.Run(); err != nil {
 		log.Fatal("Failed to get OIDC configuration path input:", err)
