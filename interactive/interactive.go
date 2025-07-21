@@ -214,7 +214,7 @@ func exportForm() ExportConfig {
 	modeSelector := huh.NewSelect[exportHandler.ExportMode]().
 		Title("Select export modes").
 		Options(
-			huh.NewOption("JSON Data Template", exportHandler.TemplateMode),
+			huh.NewOption("JSON Data Template", exportHandler.StoreMode),
 			huh.NewOption("Memory State", exportHandler.MemoryExportMode),
 			huh.NewOption("OIDC Configuration Template", exportHandler.OidcMode),
 		).
@@ -228,7 +228,7 @@ func exportForm() ExportConfig {
 		TitleFunc(
 			func() string {
 				switch selectedMode {
-				case exportHandler.TemplateMode:
+				case exportHandler.StoreMode:
 					return "JSON Data Template File Path"
 				case exportHandler.MemoryExportMode:
 					return "Memory State File Path"
@@ -243,8 +243,8 @@ func exportForm() ExportConfig {
 		Prompt("Enter file path:").
 		PlaceholderFunc(func() string {
 			switch selectedMode {
-			case exportHandler.TemplateMode:
-				return exportHandler.DefaultTemplateFile
+			case exportHandler.StoreMode:
+				return exportHandler.DefaultStoreFile
 			case exportHandler.MemoryExportMode:
 				return exportHandler.DefaultMemoryFile
 			case exportHandler.OidcMode:

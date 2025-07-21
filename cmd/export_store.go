@@ -30,9 +30,9 @@ Examples:
   mock-todo-server export store /path/to/template.json`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		filePath := export.GetOutputPath(args, export.DefaultTemplateFile)
+		filePath := export.GetOutputPath(args, export.DefaultStoreFile)
 
-		if err := export.ExportWithMode(export.TemplateMode, filePath); err != nil {
+		if err := export.ExportWithMode(export.StoreMode, filePath); err != nil {
 			fmt.Printf("Error exporting store template: %v\n", err)
 			os.Exit(1)
 		}
