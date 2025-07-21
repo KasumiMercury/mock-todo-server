@@ -131,17 +131,14 @@ func serveForm() *server.Config {
 	}
 	config.Port = port
 
-	var disabledAuth bool
 	authDisableConfirm := huh.NewConfirm().
-		Title("Do you want to disable authentication for task API endpoints?").
+		Title("Enable Authentication for the tasks endpoint").
 		Affirmative("Yes").
 		Negative("No").
-		Value(&disabledAuth)
+		Value(&config.AuthRequired)
 	if err := authDisableConfirm.Run(); err != nil {
 		log.Fatal("Failed to confirm authentication disable:", err)
 	}
-
-	config.AuthRequired = !disabledAuth
 
 	jsonFilePathInput := huh.NewInput().
 		Title("JSON File Path").
