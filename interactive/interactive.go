@@ -38,19 +38,15 @@ func Start() {
 			}
 			log.Println("Server stop request sent")
 		case export:
-			exportConfigs := exportForm()
-			for _, config := range exportConfigs {
-				if err := exportHandler.ExportWithMode(config.Mode, config.FilePath); err != nil {
-					log.Printf("Failed to export %s: %v", config.Mode, err)
-				}
+			exportConfig := exportForm()
+			if err := exportHandler.ExportWithMode(exportConfig.Mode, exportConfig.FilePath); err != nil {
+				log.Printf("Failed to export %s: %v", exportConfig.Mode, err)
 			}
 
-			for _, config := range exportConfigs {
-				flagConfig := flagmanager.NewExportFlagConfig()
-				flagConfig.FromExportMode(config.Mode)
-				flags := flagConfig.ReconstructFlags()
-				displayOneLiner("export", flags, config.FilePath)
-			}
+			flagConfig := flagmanager.NewExportFlagConfig()
+			flagConfig.FromExportMode(exportConfig.Mode)
+			flags := flagConfig.ReconstructFlags()
+			displayOneLiner("export", flags, exportConfig.FilePath)
 		case exit:
 			return
 		default:
@@ -131,17 +127,14 @@ func serveForm() *server.Config {
 	}
 	config.Port = port
 
-	var disabledAuth bool
 	authDisableConfirm := huh.NewConfirm().
-		Title("Do you want to disable authentication for task API endpoints?").
+		Title("Enable Authentication for the tasks endpoint").
 		Affirmative("Yes").
 		Negative("No").
-		Value(&disabledAuth)
+		Value(&config.AuthRequired)
 	if err := authDisableConfirm.Run(); err != nil {
 		log.Fatal("Failed to confirm authentication disable:", err)
 	}
-
-	config.AuthRequired = !disabledAuth
 
 	jsonFilePathInput := huh.NewInput().
 		Title("JSON File Path").
@@ -216,67 +209,60 @@ func serveForm() *server.Config {
 	return config
 }
 
-func exportForm() []ExportConfig {
-	var configs []ExportConfig
-
-	var selectedModes []exportHandler.ExportMode
-	modeSelector := huh.NewMultiSelect[exportHandler.ExportMode]().
+func exportForm() ExportConfig {
+	var selectedMode exportHandler.ExportMode
+	modeSelector := huh.NewSelect[exportHandler.ExportMode]().
 		Title("Select export modes").
 		Options(
 			huh.NewOption("JSON Data Template", exportHandler.TemplateMode),
 			huh.NewOption("Memory State", exportHandler.MemoryExportMode),
 			huh.NewOption("OIDC Configuration Template", exportHandler.OidcMode),
 		).
-		Value(&selectedModes)
+		Value(&selectedMode)
 	if err := modeSelector.Run(); err != nil {
 		log.Fatal("Failed to select export modes:", err)
 	}
 
-	for _, mode := range selectedModes {
-		filePath := ""
-
-		filePathInput := huh.NewInput().
-			TitleFunc(
-				func() string {
-					switch mode {
-					case exportHandler.TemplateMode:
-						return "JSON Data Template File Path"
-					case exportHandler.MemoryExportMode:
-						return "Memory State File Path"
-					case exportHandler.OidcMode:
-						return "OIDC Configuration Template File Path"
-					default:
-						log.Fatal("Unknown mode:", mode)
-						return ""
-					}
-				}, &mode).
-			Description("leave empty for default file path").
-			Prompt("Enter file path:").
-			PlaceholderFunc(func() string {
-				switch mode {
+	filePath := ""
+	filePathInput := huh.NewInput().
+		TitleFunc(
+			func() string {
+				switch selectedMode {
 				case exportHandler.TemplateMode:
-					return exportHandler.DefaultTemplateFile
+					return "JSON Data Template File Path"
 				case exportHandler.MemoryExportMode:
-					return exportHandler.DefaultMemoryFile
+					return "Memory State File Path"
 				case exportHandler.OidcMode:
-					return exportHandler.DefaultOidcFile
+					return "OIDC Configuration Template File Path"
 				default:
-					log.Fatal("Unknown mode:", mode)
+					log.Fatal("Unknown mode:", selectedMode)
 					return ""
 				}
-			}, &mode).
-			Value(&filePath)
-		if err := filePathInput.Run(); err != nil {
-			log.Fatal("Failed to get file path input:", err)
-		}
-
-		configs = append(configs, ExportConfig{
-			Mode:     mode,
-			FilePath: filePath,
-		})
+			}, &selectedMode).
+		Description("leave empty for default file path").
+		Prompt("Enter file path:").
+		PlaceholderFunc(func() string {
+			switch selectedMode {
+			case exportHandler.TemplateMode:
+				return exportHandler.DefaultTemplateFile
+			case exportHandler.MemoryExportMode:
+				return exportHandler.DefaultMemoryFile
+			case exportHandler.OidcMode:
+				return exportHandler.DefaultOidcFile
+			default:
+				log.Fatal("Unknown mode:", selectedMode)
+				return ""
+			}
+		}, &selectedMode).
+		Value(&filePath)
+	if err := filePathInput.Run(); err != nil {
+		log.Fatal("Failed to get file path input:", err)
 	}
 
-	return configs
+	return ExportConfig{
+		Mode:     selectedMode,
+		FilePath: filePath,
+	}
 }
 
 // displayOneLiner prints the command-line equivalent of the configuration
