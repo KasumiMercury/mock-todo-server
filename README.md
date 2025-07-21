@@ -31,12 +31,12 @@ Stop the server:
 
 Export the current memory state to a JSON file:
 ```bash
-./mock-todo-server export --memory backup.json
+./mock-todo-server export memory backup.json
 ```
 
 Output a template for file storage:
 ```bash
-./mock-todo-server export --template
+./mock-todo-server export store
 ```
 
 The template includes 2 sample users with hashed passwords:
@@ -76,26 +76,26 @@ To persist data, use file storage:
 
 ```bash
 # Export a JSON template for file-based storage
-./mock-todo-server export --template
+./mock-todo-server export store
 
 # Export the template to a custom file
-./mock-todo-server export --template custom.json
+./mock-todo-server export store custom.json
 
 # Template includes sample users:
 # - user1 (password: password1)
 # - user2 (password: password2)
 
 # Export the current server memory state
-./mock-todo-server export --memory
+./mock-todo-server export memory
 
 # Export the memory state to a custom file
-./mock-todo-server export --memory backup.json
+./mock-todo-server export memory backup.json
 
 # Export OIDC configuration template
-./mock-todo-server export --oidc-config
+./mock-todo-server export oidc
 
 # Export OIDC config template to a custom file
-./mock-todo-server export --oidc-config my-oidc-config.json
+./mock-todo-server export oidc my-oidc-config.json
 ```
 
 ## API Documentation
@@ -207,7 +207,7 @@ OIDC mode requires a configuration file specified with `--oidc-config-path`. Thi
 **Generate Configuration Template:**
 ```bash
 # Generate OIDC configuration template
-./mock-todo-server export --oidc-config oidc-config.json
+./mock-todo-server export oidc oidc-config.json
 ```
 
 **Start Server with OIDC:**
@@ -329,7 +329,7 @@ JSON format for file storage:
 }
 ```
 
-**Note**: When using the template export (`--template`), sample users are included with pre-hashed passwords:
+**Note**: When using the template export (`export store`), sample users are included with pre-hashed passwords:
 - **user1** with password: `password1`
 - **user2** with password: `password2`
 
