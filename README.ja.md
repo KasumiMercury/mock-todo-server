@@ -29,12 +29,12 @@ Go言語ベースのモックTODOサーバー。タスク管理のためのREST 
 
 現在のメモリ状態をJSONファイルにエクスポート：
 ```bash
-./mock-todo-server export --memory backup.json
+./mock-todo-server export memory backup.json
 ```
 
 ファイルストレージ用のテンプレート出力：
 ```bash
-./mock-todo-server export --template
+./mock-todo-server export store
 ```
 
 テンプレートは2つのサンプルユーザーをハッシュ化されたパスワードとともに含む：
@@ -74,26 +74,26 @@ Go言語ベースのモックTODOサーバー。タスク管理のためのREST 
 
 ```bash
 # ファイルベースストレージ用のJSONテンプレートをエクスポート
-./mock-todo-server export --template
+./mock-todo-server export store
 
 # テンプレートをカスタムファイルにエクスポート
-./mock-todo-server export --template custom.json
+./mock-todo-server export store custom.json
 
 # テンプレートはサンプルユーザーを含む：
 # - user1 （パスワード: password1）
 # - user2 （パスワード: password2）
 
 # 現在のサーバーメモリ状態をエクスポート
-./mock-todo-server export --memory
+./mock-todo-server export memory
 
 # メモリ状態をカスタムファイルにエクスポート
-./mock-todo-server export --memory backup.json
+./mock-todo-server export memory backup.json
 
 # OIDC設定テンプレートをエクスポート
-./mock-todo-server export --oidc-config
+./mock-todo-server export oidc
 
 # OIDC設定テンプレートをカスタムファイルにエクスポート
-./mock-todo-server export --oidc-config my-oidc-config.json
+./mock-todo-server export oidc my-oidc-config.json
 ```
 
 ## API ドキュメント
@@ -205,7 +205,7 @@ OIDCモードでは `--oidc-config-path` で指定する設定ファイルが必
 **設定テンプレートの生成:**
 ```bash
 # OIDC設定テンプレートを生成
-./mock-todo-server export --oidc-config oidc-config.json
+./mock-todo-server export oidc oidc-config.json
 ```
 
 **OIDCモードでサーバー起動:**
@@ -327,7 +327,7 @@ curl -X GET http://localhost:8080/tasks \
 }
 ```
 
-**注意**: テンプレートエクスポート（`--template`）を使用する場合、サンプルユーザーがハッシュ化済みパスワードとともに含まれている：
+**注意**: テンプレートエクスポート（`export store`）を使用する場合、サンプルユーザーがハッシュ化済みパスワードとともに含まれている：
 - **user1** パスワード: `password1`
 - **user2** パスワード: `password2`
 
